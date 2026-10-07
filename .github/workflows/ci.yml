@@ -1,0 +1,25 @@
+name: SDK checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Install the Node runtime library
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libatomic1
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - run: node .yarn/releases/yarn-4.6.0.cjs install --immutable
+      - run: node .yarn/releases/yarn-4.6.0.cjs check

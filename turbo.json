@@ -1,0 +1,26 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "stream",
+  "tasks": {
+    "lint": {
+      "outputLogs": "new-only"
+    },
+    "depcruise": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "outputLogs": "new-only"
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["build", "^typecheck"],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": ["build", "^test"],
+      "outputs": []
+    }
+  }
+}

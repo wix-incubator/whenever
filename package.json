@@ -1,0 +1,23 @@
+{
+  "name": "whenever",
+  "private": true,
+  "license": "MIT",
+  "packageManager": "yarn@4.6.0",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "depcruise": "turbo run depcruise",
+    "test": "turbo run test",
+    "check": "turbo run build typecheck lint depcruise test"
+  },
+  "devDependencies": {
+    "turbo": "2.10.2"
+  },
+  "resolutions": {
+    "typed-rest-client/qs": "6.15.3"
+  }
+}

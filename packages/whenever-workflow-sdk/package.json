@@ -1,0 +1,71 @@
+{
+  "name": "@wix/whenever-workflow-sdk",
+  "version": "0.1.0",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "versionBumpStrategy": "minor",
+    "preserveSemverRange": true
+  },
+  "files": [
+    "dist"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./contract": {
+      "types": "./dist/contract.d.ts",
+      "default": "./dist/contract.js"
+    },
+    "./webhooks": {
+      "types": "./dist/webhooks.d.ts",
+      "default": "./dist/webhooks.js"
+    },
+    "./host": {
+      "types": "./dist/host.d.ts",
+      "default": "./dist/host.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "rm -rf dist && tsc && node scripts/generate-contract.ts",
+    "typecheck": "tsc --project tsconfig.typecheck.json && tsc --noEmit --project tsconfig.examples.json && tsc --noEmit --project tsconfig.scripts.json",
+    "lint": "eslint --ext .ts src test scripts",
+    "depcruise": "depcruise src test",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.25",
+    "@typescript-eslint/eslint-plugin": "^8.38.0",
+    "@typescript-eslint/parser": "^8.38.0",
+    "dependency-cruiser": "^18.1.0",
+    "eslint": "^8.57.1",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-simple-import-sort": "^12.0.0",
+    "eslint-plugin-unused-imports": "^4.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
+  },
+  "wix": {
+    "artifact": {
+      "groupId": "com.wixpress.whenever",
+      "artifactId": "whenever-workflow-sdk"
+    },
+    "validations": {
+      "postBuild": [
+        "lint",
+        "test",
+        "typecheck"
+      ],
+      "postDependenciesBuild": [
+        "depcruise"
+      ]
+    }
+  }
+}

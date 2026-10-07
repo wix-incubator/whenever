@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+.yarn/install-state.gz
+.turbo/
+*.tsbuildinfo
+.stryker-tmp/
+**/reports/mutation/
+.env
+.env.*
+!.env.example
+.DS_Store

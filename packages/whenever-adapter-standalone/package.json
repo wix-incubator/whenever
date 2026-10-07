@@ -1,0 +1,71 @@
+{
+  "name": "@wix/whenever-adapter-standalone",
+  "version": "0.1.0",
+  "description": "Runtime implementations of the integration ports @wix/whenever-workflow-sdk declares",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "versionBumpStrategy": "minor",
+    "preserveSemverRange": true
+  },
+  "files": [
+    "dist"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./internal": {
+      "types": "./dist/internal.d.ts",
+      "default": "./dist/internal.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "rm -rf dist && tsc",
+    "typecheck": "tsc --project tsconfig.typecheck.json",
+    "lint": "eslint --ext .ts src test",
+    "depcruise": "depcruise src test",
+    "test": "vitest run",
+    "mutation": "stryker run"
+  },
+  "dependencies": {
+    "@wix/whenever-workflow-sdk": "workspace:^",
+    "undici": "^7.29.0"
+  },
+  "devDependencies": {
+    "@stryker-mutator/core": "10.0.0",
+    "@stryker-mutator/vitest-runner": "10.0.0",
+    "@types/node": "^20.19.25",
+    "@typescript-eslint/eslint-plugin": "^8.38.0",
+    "@typescript-eslint/parser": "^8.38.0",
+    "dependency-cruiser": "^18.1.0",
+    "eslint": "^8.57.1",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-simple-import-sort": "^12.0.0",
+    "eslint-plugin-unused-imports": "^4.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
+  },
+  "wix": {
+    "artifact": {
+      "groupId": "com.wixpress.whenever",
+      "artifactId": "whenever-adapter-standalone"
+    },
+    "validations": {
+      "postBuild": [
+        "lint",
+        "test",
+        "typecheck"
+      ],
+      "postDependenciesBuild": [
+        "depcruise"
+      ]
+    }
+  }
+}
