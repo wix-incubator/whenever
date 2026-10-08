@@ -1,8 +1,8 @@
 # Whenever SDK and standalone adapter
 
-Build a workflow automation locally with your coding agent, then deploy it to [Whenever](https://www.wix.com/whenever/), which runs it as code on a schedule, a webhook, an event or on demand, with managed credentials and a run log. Your agent writes typed TypeScript against this SDK; the deployed workflow runs on its own trigger, without the agent.
+Build a workflow automation locally with your coding agent, then deploy it to [Whenever](https://www.whenever.dev/), which runs it as code on a schedule, a webhook, an event or on demand, with managed credentials and a run log. Your agent writes typed TypeScript against this SDK; the deployed workflow runs on its own trigger, without the agent.
 
-**Get started:** [www.wix.com/whenever](https://www.wix.com/whenever/) · [Docs](https://www.wix.com/whenever/docs) · [MCP setup](https://www.wix.com/whenever/mcp)
+**Get started:** [www.whenever.dev](https://www.whenever.dev/) · [Docs](https://www.whenever.dev/docs) · [MCP setup](https://www.whenever.dev/mcp)
 
 ```ts
 import {
@@ -43,10 +43,10 @@ export default defineWorkflow<void, { status: number }>(async (ctx) => {
 Paste this into any coding tool that can read a URL (Claude Code, Cursor, Codex, Copilot, Windsurf, …):
 
 ```text
-deploy my workflow automation code, use www.wix.com/whenever/skill.md
+deploy my workflow automation code, use www.whenever.dev/skill.md
 ```
 
-[`skill.md`](https://www.wix.com/whenever/skill.md) is a plain-markdown authoring guide: module shape, determinism rules and the publish sequence. The agent refactors your code into a workflow module and deploys it.
+[`skill.md`](https://www.whenever.dev/skill.md) is a plain-markdown authoring guide: module shape, determinism rules and the publish sequence. The agent refactors your code into a workflow module and deploys it.
 
 ### Option 2: connect the MCP server
 
