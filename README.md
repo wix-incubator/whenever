@@ -4,6 +4,38 @@ Build a workflow automation locally with your coding agent, then deploy it to [W
 
 **Get started:** [www.wix.com/whenever](https://www.wix.com/whenever/) · [Docs](https://www.wix.com/whenever/docs) · [MCP setup](https://www.wix.com/whenever/mcp)
 
+```ts
+import {
+  daily,
+  defineStep,
+  defineWorkflow,
+  manual,
+  RetryableError,
+  type WorkflowContext,
+  type WorkflowManifest,
+} from "@wix/whenever-workflow-sdk";
+
+export const manifest: WorkflowManifest = {
+  name: "daily-rate-report",
+  triggers: [daily({ key: "morning-report", at: "09:00", tz: "Europe/Vilnius" }), manual({ key: "rerun" })],
+};
+
+export const fileReport = defineStep("file-report", async (ctx: WorkflowContext, rate: number) => {
+  const receipt = await ctx.integrations.http.post({
+    url: ctx.config.REPORT_URL,
+    headers: { Authorization: `Bearer ${ctx.secrets.REPORT_API_KEY}` },
+    body: { rate, observedAt: ctx.now() },
+  });
+  if (receipt.status >= 500) throw new RetryableError("report endpoint is down", { retryAfterMs: 60_000 });
+  return receipt;
+});
+
+export default defineWorkflow<void, { status: number }>(async (ctx) => {
+  const receipt = await fileReport(ctx, 1.08);
+  return { status: receipt.status };
+});
+```
+
 ## Use it from your coding agent
 
 ### Option 1: paste a prompt (skill.md)
