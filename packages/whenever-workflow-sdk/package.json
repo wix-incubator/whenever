@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "license": "MIT",
   "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
     "access": "public",
     "versionBumpStrategy": "minor",
     "preserveSemverRange": true
