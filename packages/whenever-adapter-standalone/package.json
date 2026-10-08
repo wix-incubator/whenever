@@ -4,6 +4,7 @@
   "description": "Runtime implementations of the integration ports @wix/whenever-workflow-sdk declares",
   "license": "MIT",
   "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
     "access": "public",
     "versionBumpStrategy": "minor",
     "preserveSemverRange": true
