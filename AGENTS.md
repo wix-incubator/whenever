@@ -6,4 +6,4 @@ The SDK has no runtime dependencies. The standalone adapter depends on the SDK a
 
 For behavior changes, start with a failing test at the exported boundary, implement the change, run affected checks and verify the test detects a temporary break. Existing tests cover mechanical moves and behavior-preserving refactors. Prefer observable results over implementation details.
 
-Public CI installs from public npm and does not publish. Source changes use pull requests against main.
+The public checks workflow installs from public npm and does not publish. Verify that checks actually ran and inspect current branch approval requirements. Source changes use pull requests against main.
