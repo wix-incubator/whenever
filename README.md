@@ -1,5 +1,35 @@
 # Whenever SDK and standalone adapter
 
+Build a workflow automation locally with your coding agent, then deploy it to [Whenever](https://www.wix.com/whenever/), which runs it as code on a schedule, a webhook, an event or on demand, with managed credentials and a run log. Your agent writes typed TypeScript against this SDK; the deployed workflow runs on its own trigger, without the agent.
+
+**Get started:** [www.wix.com/whenever](https://www.wix.com/whenever/) · [Docs](https://www.wix.com/whenever/docs) · [MCP setup](https://www.wix.com/whenever/mcp)
+
+## Use it from your coding agent
+
+### Option 1: paste a prompt (skill.md)
+
+Paste this into any coding tool that can read a URL (Claude Code, Cursor, Codex, Copilot, Windsurf, …):
+
+```text
+deploy my workflow automation code, use www.wix.com/whenever/skill.md
+```
+
+[`skill.md`](https://www.wix.com/whenever/skill.md) is a plain-markdown authoring guide: module shape, determinism rules and the publish sequence. The agent refactors your code into a workflow module and deploys it.
+
+### Option 2: connect the MCP server
+
+The server is `https://mcp.whenever.dev` (streamable HTTP; nothing to install). Your agent can then write, test and save workflows as drafts for you to publish.
+
+| Client | Setup |
+| --- | --- |
+| Claude Code | `claude mcp add --transport http whenever https://mcp.whenever.dev` (add `--scope user` for all projects) |
+| Claude (web/desktop) | Settings → Connectors → Add custom connector → paste the URL |
+| Cursor | `~/.cursor/mcp.json`: `{ "mcpServers": { "whenever": { "url": "https://mcp.whenever.dev" } } }` |
+| Codex | `~/.codex/config.toml`: `[mcp_servers.whenever]` then `url = "https://mcp.whenever.dev"` |
+| VS Code | `.vscode/mcp.json`: `{ "servers": { "whenever": { "type": "http", "url": "https://mcp.whenever.dev" } } }` |
+
+## Packages
+
 TypeScript packages for authoring and hosting workflows.
 
 - `@wix/whenever-workflow-sdk` declares workflow definitions, steps, triggers, integration ports and errors. Its `/host` entry point runs a workflow with a host-supplied adapter.
