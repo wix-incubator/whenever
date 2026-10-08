@@ -80,19 +80,22 @@ The root `build`, `typecheck`, `lint`, `depcruise`, and `test` scripts run acros
 
 `yarn check` runs these tasks through Turbo, which builds dependencies first and caches task results and compiled output. To run checks without using cached results, use `yarn check --force`.
 
-## Hosting a workflow
+## Running a workflow locally
+
+Run the workflow above in-process with the standalone adapter. It needs no account and nothing is deployed.
 
 ```ts
-import { defineWorkflow } from "@wix/whenever-workflow-sdk";
 import { runWorkflow } from "@wix/whenever-workflow-sdk/host";
 import { createWorkflowIntegrationsFromEnv } from "@wix/whenever-adapter-standalone";
+import workflow from "./daily-rate-report";
 
-const workflow = defineWorkflow<{ name: string }, string>(async (ctx) => `Hello, ${ctx.input.name}`);
 const output = await runWorkflow(workflow, {
   adapter: { integrations: createWorkflowIntegrationsFromEnv({}) },
-  input: { name: "Ada" },
-  trigger: { type: "manual", key: "run" },
+  input: undefined,
+  trigger: { type: "manual", key: "rerun" },
+  config: { REPORT_URL: "https://example.com/reports" },
+  secrets: { REPORT_API_KEY: process.env.REPORT_API_KEY ?? "" },
 });
 ```
 
-A host supplies AI generation and Postgres execution when needed. Declaring a trigger does not schedule a job, register a webhook or publish a workflow. The host owns those operations and retry policy.
+The caller supplies AI generation and Postgres execution when the workflow needs them. Running a workflow this way does not schedule its triggers, register a webhook or publish it; deploy through [Whenever](https://www.whenever.dev/) for that.
