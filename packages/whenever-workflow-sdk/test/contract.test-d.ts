@@ -371,6 +371,7 @@ test("WebhookProvider enumerates the supported providers", () => {
     | "shopify"
     | "slack"
     | "standard-webhooks"
+    | "supabase"
     | "telegram"
     | "wix-app"
     | "wix-automations"

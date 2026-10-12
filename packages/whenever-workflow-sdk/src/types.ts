@@ -136,6 +136,7 @@ export type WebhookProvider =
   | "shopify"
   | "slack"
   | "standard-webhooks"
+  | "supabase"
   | "telegram"
   | "wix-app"
   | "wix-automations";
