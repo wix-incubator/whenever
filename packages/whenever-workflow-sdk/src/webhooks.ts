@@ -130,6 +130,17 @@ export function telegramBotWebhook(options: WebhookIdentity): WebhookTrigger {
 }
 
 /**
+ * A Supabase Database Webhook's row events, verified by the host against the `X-Webhook-Secret`
+ * header configured on the hook. `ctx.input` is `{ type, table, schema, record, old_record }` and
+ * `ctx.trigger.eventType` is its `type`: `"INSERT"`, `"UPDATE"` or `"DELETE"`.
+ *
+ * @see https://supabase.com/docs/guides/database/webhooks
+ */
+export function supabaseDatabaseWebhook(options: WebhookIdentity): WebhookTrigger {
+  return signedWebhook("supabase", options);
+}
+
+/**
  * A Wix app's webhooks: app events such as `AppInstalled` and site events such as
  * `wix.ecom.v1.order_created`. The host must verify Wix's JWT with the app's configured public key
  * and decode it: `ctx.input` is `{ eventType, instanceId, data,
