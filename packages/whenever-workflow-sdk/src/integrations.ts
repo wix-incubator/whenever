@@ -217,14 +217,88 @@ export interface WorkflowPostgres {
   query(input: PostgresQueryInput): Promise<PostgresQueryResult>;
 }
 
+export interface WebSearchInput {
+  query: string;
+  /** Results to return, 1–10. Defaults to 5. */
+  limit?: number;
+}
+
+export interface WebSearchHit {
+  url: string;
+  title?: string;
+  snippet?: string;
+}
+
+export interface WebSearchResult {
+  results: WebSearchHit[];
+}
+
+export interface WebPageInput {
+  /** An absolute public http or https address. */
+  url: string;
+  /** Requires a live fetch instead of a copy the host may have cached. */
+  fresh?: boolean;
+}
+
+/** Where a page observation came from. */
+export interface WebPageSource {
+  requestedUrl: string;
+  /** The address after redirects. */
+  finalUrl: string;
+  /** The target page's HTTP status. */
+  status: number;
+  title?: string;
+  /** Present when the host knows whether a cached copy was served. */
+  cached?: boolean;
+}
+
+export interface WebReadPageResult {
+  source: WebPageSource;
+  markdown: string;
+  /** True when the size cap cut the content, so it is not the whole page. */
+  truncated: boolean;
+}
+
+export interface WebListLinksResult {
+  source: WebPageSource;
+  /** Absolute addresses of the links on the page. */
+  links: string[];
+  /** True when the link cap cut the list, so it is not every link on the page. */
+  truncated: boolean;
+}
+
 /**
- * Everything a workflow can call. `ai`, `http`, `mcp` and `postgres` are the members declared
- * here; every other provider operation is added by binding it, which declares its own member by
- * augmenting this interface with a host-supplied declaration module.
+ * Host-supplied public web access. Pages are loaded in a browser with their JavaScript, and
+ * content is returned as extracted, never summarized or interpreted by a model. Use `http` to call
+ * an API; use `web` to read a page.
+ */
+export interface WebIntegration {
+  /**
+   * Searches the web for `query` and returns up to `limit` results with their addresses, titles
+   * and snippets. Ranking is discovery, not verification of a source.
+   */
+  search(input: WebSearchInput): Promise<WebSearchResult>;
+  /**
+   * Loads one public page and returns its readable content as markdown. A page whose status is
+   * not successful fails rather than returning its error page.
+   */
+  readPage(input: WebPageInput): Promise<WebReadPageResult>;
+  /**
+   * Loads one public page and returns the addresses it links to, without visiting them. An empty
+   * list is a valid observation; a page that failed to load fails.
+   */
+  listLinks(input: WebPageInput): Promise<WebListLinksResult>;
+}
+
+/**
+ * Everything a workflow can call. `ai`, `http`, `mcp`, `postgres` and `web` are the members
+ * declared here; every other provider operation is added by binding it, which declares its own
+ * member by augmenting this interface with a host-supplied declaration module.
  */
 export interface WorkflowIntegrations {
   ai: AiIntegration;
   http: HttpIntegration;
   mcp: McpIntegration;
   postgres: WorkflowPostgres;
+  web: WebIntegration;
 }

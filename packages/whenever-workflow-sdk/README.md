@@ -40,8 +40,10 @@ Declaring a trigger does not perform any of those operations.
 
 ## Integrations
 
-`ctx.integrations` exposes `ai`, `http`, `mcp` and `postgres` ports. The standalone adapter implements
-HTTP and MCP transports and accepts host-supplied AI generation and read-only Postgres execution.
+`ctx.integrations` exposes `ai`, `http`, `mcp`, `postgres` and `web` ports. The standalone adapter implements
+HTTP and MCP transports and accepts host-supplied AI generation, read-only Postgres execution and
+public web access. `http` calls APIs; `web` loads public pages, runs their JavaScript and returns
+extracted content without model interpretation.
 Additional provider bindings extend `WorkflowIntegrations` through TypeScript module augmentation.
 Types alone do not establish that a host implements an operation.
 

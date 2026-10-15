@@ -14,6 +14,7 @@ function fakeIntegrations(): WorkflowIntegrations {
     http: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn() },
     mcp: { read: vi.fn(), write: vi.fn() },
     postgres: { query: vi.fn() },
+    web: { search: vi.fn(), readPage: vi.fn(), listLinks: vi.fn() },
   };
 }
 

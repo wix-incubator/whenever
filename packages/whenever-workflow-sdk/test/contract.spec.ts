@@ -79,7 +79,7 @@ describe("WORKFLOW_SDK_CONTRACT", () => {
     expect(members).not.toBeNull();
     expect(
       [...members![1].matchAll(/^\s*(\w+)\s*:/gmu)].map((match) => match[1]),
-    ).toEqual(["ai", "http", "mcp", "postgres"]);
+    ).toEqual(["ai", "http", "mcp", "postgres", "web"]);
   });
 
   it("renders every core symbol into the declarations and markdown", () => {

@@ -16,6 +16,15 @@ import {
   type PostgresQueryPort,
   unavailablePostgresQuery,
 } from "./postgres-integration";
+import {
+  createWebIntegration,
+  unavailableWebListLinks,
+  unavailableWebReadPage,
+  unavailableWebSearch,
+  type WebListLinksPort,
+  type WebReadPagePort,
+  type WebSearchPort,
+} from "./web-integration";
 
 export interface CreateWorkflowIntegrationsFromEnvOptions {
   fetch?: FetchLike;
@@ -25,6 +34,9 @@ export interface CreateWorkflowIntegrationsFromEnvOptions {
   generateImage?: AiGenerateImagePort;
   generateText?: AiGenerateTextPort;
   queryPostgres?: PostgresQueryPort;
+  searchWeb?: WebSearchPort;
+  readWebPage?: WebReadPagePort;
+  listWebLinks?: WebListLinksPort;
 }
 
 export function createWorkflowIntegrationsFromEnv(
@@ -53,6 +65,11 @@ export function createWorkflowIntegrationsFromEnv(
     }),
     postgres: createPostgresIntegration({
       query: options.queryPostgres ?? unavailablePostgresQuery(),
+    }),
+    web: createWebIntegration({
+      search: options.searchWeb ?? unavailableWebSearch(),
+      readPage: options.readWebPage ?? unavailableWebReadPage(),
+      listLinks: options.listWebLinks ?? unavailableWebListLinks(),
     }),
   };
 }

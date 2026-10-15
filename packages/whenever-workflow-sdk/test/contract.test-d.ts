@@ -15,6 +15,9 @@ import type {
   PostgresQueryResult,
   WebhookAuth,
   WebhookProvider,
+  WebListLinksResult,
+  WebReadPageResult,
+  WebSearchResult,
 } from "../src/index";
 import { defineStep, defineWorkflow } from "../src/index";
 import type { Weekday } from "../src/triggers";
@@ -241,6 +244,22 @@ test("workflow context exposes a typed database query integration", () => {
   expectTypeOf(
     ctx.integrations.postgres.query({ sql: "select 1 as n" }),
   ).toEqualTypeOf<Promise<PostgresQueryResult>>();
+});
+
+test("workflow context exposes typed public web access", () => {
+  const ctx = {} as WorkflowContext;
+
+  expectTypeOf(
+    ctx.integrations.web.search({ query: "supplier lead times", limit: 3 }),
+  ).toEqualTypeOf<Promise<WebSearchResult>>();
+  expectTypeOf(
+    ctx.integrations.web.readPage({ url: "https://example.com/", fresh: true }),
+  ).toEqualTypeOf<Promise<WebReadPageResult>>();
+  expectTypeOf(
+    ctx.integrations.web.listLinks({ url: "https://example.com/" }),
+  ).toEqualTypeOf<Promise<WebListLinksResult>>();
+  expectTypeOf<WebReadPageResult["source"]["status"]>().toEqualTypeOf<number>();
+  expectTypeOf<WebListLinksResult["truncated"]>().toEqualTypeOf<boolean>();
 });
 
 test("Trigger union membership", () => {

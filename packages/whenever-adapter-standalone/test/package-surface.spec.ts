@@ -26,6 +26,7 @@ describe("the adapters package", () => {
       http: expect.any(Object) as unknown,
       mcp: expect.any(Object) as unknown,
       postgres: expect.any(Object) as unknown,
+      web: expect.any(Object) as unknown,
     });
   });
 

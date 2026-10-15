@@ -156,6 +156,7 @@ describe("the ports a workflow host is handed", () => {
       "http",
       "mcp",
       "postgres",
+      "web",
     ]);
   });
 

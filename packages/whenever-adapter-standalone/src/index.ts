@@ -76,3 +76,21 @@ export {
 } from "./provider-input-refusal";
 export type { CreateWorkflowIntegrationsFromEnvOptions } from "./runtime";
 export { createWorkflowIntegrationsFromEnv } from "./runtime";
+export type {
+  WebIntegrationOptions,
+  WebListLinksPort,
+  WebReadPagePort,
+  WebSearchPort,
+} from "./web-integration";
+export {
+  createWebIntegration,
+  unavailableWebListLinks,
+  unavailableWebReadPage,
+  unavailableWebSearch,
+  WEB_PAGE_MAX_LINKS,
+  WEB_PAGE_MAX_MARKDOWN_CHARS,
+  WEB_PAGE_MAX_URL_CHARS,
+  WEB_SEARCH_DEFAULT_LIMIT,
+  WEB_SEARCH_MAX_LIMIT,
+  WEB_SEARCH_MAX_QUERY_CHARS,
+} from "./web-integration";

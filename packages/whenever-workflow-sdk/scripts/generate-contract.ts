@@ -124,7 +124,7 @@ ${declarations}
 
 ## Side effects (\`ctx.integrations\`)
 
-\`ctx.integrations\` is a \`WorkflowIntegrations\` port. The SDK itself declares ${providerKeys.join(", ")}. \`http\` and \`mcp\` take an address the author supplies; \`postgres\` and \`ai\` use host-supplied ports.
+\`ctx.integrations\` is a \`WorkflowIntegrations\` port. The SDK itself declares ${providerKeys.join(", ")}. \`http\` and \`mcp\` take an address the author supplies; \`postgres\`, \`ai\` and \`web\` use host-supplied ports. Call APIs with \`http\`; read public pages with \`web\`.
 
 Every other provider operation comes from a binding supplied by the host. Its input and result types are declared as a \`WorkflowIntegrations\` augmentation, which is what makes \`ctx.integrations.<toolkit>.<operation>\` compile. An operation that has not been bound in this workspace neither typechecks nor runs, so bind it before writing the call — and take the call and the types from what the bind returned rather than restating them.
 
