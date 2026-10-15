@@ -93,4 +93,5 @@ export {
   WEB_SEARCH_DEFAULT_LIMIT,
   WEB_SEARCH_MAX_LIMIT,
   WEB_SEARCH_MAX_QUERY_CHARS,
+  WEB_UNAVAILABLE,
 } from "./web-integration";

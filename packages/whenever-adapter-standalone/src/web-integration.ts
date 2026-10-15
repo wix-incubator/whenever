@@ -16,6 +16,8 @@ export const WEB_PAGE_MAX_URL_CHARS = 2_048;
 export const WEB_PAGE_MAX_MARKDOWN_CHARS = 200_000;
 /** Hosts cut a link list at this many links and report `truncated`. */
 export const WEB_PAGE_MAX_LINKS = 500;
+/** The refusal code of a host that supplies no web implementation. */
+export const WEB_UNAVAILABLE = "WEB_UNAVAILABLE";
 
 export type WebSearchPort = (
   input: Required<WebSearchInput>,
@@ -96,7 +98,7 @@ export function prepareWebPageInput(input: unknown): WebPageInput {
 function unavailable(operation: string): NonRetryableError {
   return new NonRetryableError(
     "Public web access requires a host-supplied implementation",
-    { code: "WEB_UNAVAILABLE", operation },
+    { code: WEB_UNAVAILABLE, operation },
   );
 }
 
