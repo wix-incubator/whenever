@@ -220,6 +220,58 @@ describe("a prompt with a standing instruction", () => {
   });
 });
 
+describe("a call choosing its model and reasoning effort", () => {
+  it.each([
+    { shape: "a prompt call", input: { prompt: "Hi.", model: "vendor/some-model", reasoningEffort: "low" } },
+    { shape: "a prompt call naming a 100-character model", input: { prompt: "Hi.", model: "m".repeat(100) } },
+    {
+      shape: "a conversation",
+      input: {
+        messages: [{ role: "user", content: "Hi." }],
+        model: "vendor/some-model",
+        reasoningEffort: "medium",
+      },
+    },
+  ])("hands both to the port on $shape", async ({ input }) => {
+    const generateText = generating("Hello.");
+    const integration = createAiIntegration({
+      generateImage: unavailableAiGenerateImage(),
+      generateText,
+    });
+
+    await integration.generateText(input as never);
+
+    expect(generateText).toHaveBeenCalledWith(input, {});
+  });
+
+  it.each([
+    { when: "the effort is max", input: { prompt: "Hi.", reasoningEffort: "max" } },
+    {
+      when: "a conversation's effort is not a string",
+      input: { messages: [{ role: "user", content: "Hi." }], reasoningEffort: 2 },
+    },
+    { when: "the model is not a string", input: { prompt: "Hi.", model: 42 } },
+    { when: "the model contains a space", input: { prompt: "Hi.", model: "openai gpt" } },
+    { when: "the model is empty", input: { prompt: "Hi.", model: "" } },
+    {
+      when: "a conversation's model is longer than any id",
+      input: { messages: [{ role: "user", content: "Hi." }], model: "m".repeat(101) },
+    },
+  ])("refuses the call before reaching a model when $when", async ({ input }) => {
+    const generateText = generating("never");
+    const integration = createAiIntegration({
+      generateImage: unavailableAiGenerateImage(),
+      generateText,
+    });
+
+    await expect(integration.generateText(input as never)).rejects.toMatchObject({
+      code: "INVALID_AI_REQUEST",
+      retryable: false,
+    });
+    expect(generateText).not.toHaveBeenCalled();
+  });
+});
+
 const GET_ISSUE = {
   description: "Read one Jira issue by key.",
   parameters: {

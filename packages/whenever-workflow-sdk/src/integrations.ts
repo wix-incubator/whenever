@@ -1,5 +1,15 @@
+/** How long a model reasons before it answers; more effort is slower and costs more. */
+export type AiReasoningEffort = "low" | "medium" | "high";
+
+/** Settings every text generation accepts. Omit them for the host's defaults. */
+export interface AiGenerationSettings {
+  /** A model id, e.g. `"provider/model"`. Hosts decide which ids exist and may refuse others. */
+  model?: string;
+  reasoningEffort?: AiReasoningEffort;
+}
+
 /** One-shot generation: an instruction and its content in `prompt`, optionally steered by `system`. */
-export interface AiGenerateTextInput {
+export interface AiGenerateTextInput extends AiGenerationSettings {
   prompt: string;
   system?: string;
   messages?: never;
@@ -63,7 +73,8 @@ export type AiToolChoice<TName extends string = string> =
   | { readonly name: TName };
 
 /** A turn of a conversation: the whole history so far, oldest first. */
-export interface AiConversationInput<TTools extends AiTools = AiTools> {
+export interface AiConversationInput<TTools extends AiTools = AiTools>
+  extends AiGenerationSettings {
   prompt?: never;
   system?: string;
   messages: readonly AiMessage[];
@@ -71,7 +82,7 @@ export interface AiConversationInput<TTools extends AiTools = AiTools> {
   toolChoice?: AiToolChoice<NoInfer<keyof TTools & string>>;
 }
 
-export interface AiConversationTextInput {
+export interface AiConversationTextInput extends AiGenerationSettings {
   prompt?: never;
   system?: string;
   messages: readonly AiMessage[];
@@ -111,9 +122,8 @@ export interface AiIntegration {
   /**
    * Generates text from one prompt and returns it. Put everything the model needs — the
    * instruction and the content it works on — into `prompt`, optionally with a standing
-   * instruction in `system`, and read the answer from `result.text`. There are no model,
-   * temperature or length settings here; the host supplies the generation implementation and
-   * configures its model and deadlines.
+   * instruction in `system`, and read the answer from `result.text`. `model` and
+   * `reasoningEffort` pick among the models the host offers; the host configures deadlines.
    */
   generateText(input: AiGenerateTextInput): Promise<AiGenerateTextResult>;
 

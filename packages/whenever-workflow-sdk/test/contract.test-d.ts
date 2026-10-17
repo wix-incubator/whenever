@@ -151,6 +151,25 @@ test("workflow context exposes a typed AI text generation integration", () => {
   expectTypeOf<{ prompt: "x" }>().toExtend<AiGenerateTextInput>();
 });
 
+test("every text generation shape takes a model and a reasoning effort", () => {
+  const ai = {} as WorkflowContext["integrations"]["ai"];
+  const messages: AiMessage[] = [{ role: "user", content: "Hi." }];
+
+  expectTypeOf(
+    ai.generateText({ prompt: "Hi.", model: "provider/large", reasoningEffort: "low" }),
+  ).toEqualTypeOf<Promise<AiGenerateTextResult>>();
+  expectTypeOf(
+    ai.generateText({ messages, model: "provider/small", reasoningEffort: "medium" }),
+  ).toEqualTypeOf<Promise<AiConversationTextResult>>();
+  expectTypeOf(
+    ai.generateText({ messages, tools: JIRA_TOOLS, reasoningEffort: "high" }),
+  ).toEqualTypeOf<Promise<AiConversationResult<"getIssue" | "editIssue">>>();
+  // @ts-expect-error reasoning effort is low, medium or high
+  void ai.generateText({ prompt: "Hi.", reasoningEffort: "max" });
+  // @ts-expect-error sampling settings are not offered
+  void ai.generateText({ prompt: "Hi.", temperature: 0 });
+});
+
 const JIRA_TOOLS = {
   getIssue: {
     description: "Read one Jira issue.",
