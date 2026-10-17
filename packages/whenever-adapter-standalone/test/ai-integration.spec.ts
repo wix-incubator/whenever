@@ -1,4 +1,4 @@
-import { NonRetryableError, RetryableError } from "@wix/whenever-workflow-sdk";
+import { AI_TEXT_MODELS, NonRetryableError, RetryableError } from "@wix/whenever-workflow-sdk";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -222,13 +222,15 @@ describe("a prompt with a standing instruction", () => {
 
 describe("a call choosing its model and reasoning effort", () => {
   it.each([
-    { shape: "a prompt call", input: { prompt: "Hi.", model: "vendor/some-model", reasoningEffort: "low" } },
-    { shape: "a prompt call naming a 100-character model", input: { prompt: "Hi.", model: "m".repeat(100) } },
+    ...AI_TEXT_MODELS.map((model) => ({
+      shape: `a prompt call on ${model}`,
+      input: { prompt: "Hi.", model, reasoningEffort: "low" },
+    })),
     {
       shape: "a conversation",
       input: {
         messages: [{ role: "user", content: "Hi." }],
-        model: "vendor/some-model",
+        model: AI_TEXT_MODELS[0],
         reasoningEffort: "medium",
       },
     },
@@ -251,11 +253,10 @@ describe("a call choosing its model and reasoning effort", () => {
       input: { messages: [{ role: "user", content: "Hi." }], reasoningEffort: 2 },
     },
     { when: "the model is not a string", input: { prompt: "Hi.", model: 42 } },
-    { when: "the model contains a space", input: { prompt: "Hi.", model: "openai gpt" } },
-    { when: "the model is empty", input: { prompt: "Hi.", model: "" } },
+    { when: "the model is not offered", input: { prompt: "Hi.", model: "vendor/some-model" } },
     {
-      when: "a conversation's model is longer than any id",
-      input: { messages: [{ role: "user", content: "Hi." }], model: "m".repeat(101) },
+      when: "a conversation's model differs from an offered one only in case",
+      input: { messages: [{ role: "user", content: "Hi." }], model: AI_TEXT_MODELS[0].toUpperCase() },
     },
   ])("refuses the call before reaching a model when $when", async ({ input }) => {
     const generateText = generating("never");

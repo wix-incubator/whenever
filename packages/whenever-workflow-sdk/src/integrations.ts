@@ -1,10 +1,21 @@
 /** How long a model reasons before it answers; more effort is slower and costs more. */
 export type AiReasoningEffort = "low" | "medium" | "high";
 
+/** The models `ai.generateText` can run on. */
+export const AI_TEXT_MODELS = [
+  "anthropic/claude-opus-5",
+  "anthropic/claude-sonnet-5",
+  "google/gemini-3.5-flash",
+  "openai/gpt-5.4-mini",
+  "openai/gpt-5.6-luna",
+  "openai/gpt-6-sol",
+] as const;
+
+export type AiTextModel = (typeof AI_TEXT_MODELS)[number];
+
 /** Settings every text generation accepts. Omit them for the host's defaults. */
 export interface AiGenerationSettings {
-  /** A model id, e.g. `"provider/model"`. Hosts decide which ids exist and may refuse others. */
-  model?: string;
+  model?: AiTextModel;
   reasoningEffort?: AiReasoningEffort;
 }
 

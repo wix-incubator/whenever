@@ -156,16 +156,18 @@ test("every text generation shape takes a model and a reasoning effort", () => {
   const messages: AiMessage[] = [{ role: "user", content: "Hi." }];
 
   expectTypeOf(
-    ai.generateText({ prompt: "Hi.", model: "provider/large", reasoningEffort: "low" }),
+    ai.generateText({ prompt: "Hi.", model: "openai/gpt-6-sol", reasoningEffort: "low" }),
   ).toEqualTypeOf<Promise<AiGenerateTextResult>>();
   expectTypeOf(
-    ai.generateText({ messages, model: "provider/small", reasoningEffort: "medium" }),
+    ai.generateText({ messages, model: "anthropic/claude-sonnet-5", reasoningEffort: "medium" }),
   ).toEqualTypeOf<Promise<AiConversationTextResult>>();
   expectTypeOf(
     ai.generateText({ messages, tools: JIRA_TOOLS, reasoningEffort: "high" }),
   ).toEqualTypeOf<Promise<AiConversationResult<"getIssue" | "editIssue">>>();
   // @ts-expect-error reasoning effort is low, medium or high
   void ai.generateText({ prompt: "Hi.", reasoningEffort: "max" });
+  // @ts-expect-error only offered models can be named
+  void ai.generateText({ prompt: "Hi.", model: "openai/gpt-4" });
   // @ts-expect-error sampling settings are not offered
   void ai.generateText({ prompt: "Hi.", temperature: 0 });
 });

@@ -18,6 +18,7 @@ export type {
   AiIntegration,
   AiMessage,
   AiReasoningEffort,
+  AiTextModel,
   AiTool,
   AiToolCall,
   AiToolChoice,
@@ -38,6 +39,7 @@ export type {
   WorkflowIntegrations,
   WorkflowPostgres,
 } from "./integrations";
+export { AI_TEXT_MODELS } from "./integrations";
 export type { CreateWorkflowContextOptions } from "./runtime";
 export { createWorkflowContext } from "./runtime";
 export type {

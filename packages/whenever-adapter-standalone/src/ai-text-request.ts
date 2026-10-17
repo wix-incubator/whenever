@@ -1,7 +1,9 @@
 import {
+  AI_TEXT_MODELS,
   type AiGenerationSettings,
   type AiMessage,
   type AiReasoningEffort,
+  type AiTextModel,
   type AiTool,
   type AiToolCall,
   type AiToolChoice,
@@ -14,7 +16,6 @@ export const AI_PROMPT_LIMIT_CHARACTERS = 100_000;
 export const AI_CONVERSATION_LIMIT_CHARACTERS = 1_000_000;
 export const AI_CONVERSATION_MESSAGE_LIMIT = 200;
 export const AI_TOOL_LIMIT = 64;
-export const AI_MODEL_ID_LIMIT_CHARACTERS = 100;
 
 const TOOL_NAME = /^[A-Za-z0-9_-]{1,64}$/u;
 export const AI_REASONING_EFFORTS: readonly AiReasoningEffort[] = ["low", "medium", "high"];
@@ -94,25 +95,17 @@ function text(value: unknown, name: string): string {
   return value;
 }
 
-// The model id is only shaped here; which ids exist is the host's catalog to decide.
 function prepareSettings(fields: Record<string, unknown>): AiGenerationSettings {
   const model = fields.model;
-  if (
-    model !== undefined &&
-    (typeof model !== "string" ||
-      !/^\S+$/u.test(model) ||
-      model.length > AI_MODEL_ID_LIMIT_CHARACTERS)
-  ) {
-    throw invalid(
-      `model must be a model id of at most ${String(AI_MODEL_ID_LIMIT_CHARACTERS)} characters without spaces`,
-    );
+  if (model !== undefined && !AI_TEXT_MODELS.includes(model as AiTextModel)) {
+    throw invalid(`model must be one of ${AI_TEXT_MODELS.map((value) => JSON.stringify(value)).join(", ")}`);
   }
   const effort = fields.reasoningEffort;
   if (effort !== undefined && !AI_REASONING_EFFORTS.includes(effort as AiReasoningEffort)) {
     throw invalid(`reasoningEffort must be ${AI_REASONING_EFFORTS.map((value) => JSON.stringify(value)).join(", ")}`);
   }
   return {
-    ...(model === undefined ? {} : { model }),
+    ...(model === undefined ? {} : { model: model as AiTextModel }),
     ...(effort === undefined ? {} : { reasoningEffort: effort as AiReasoningEffort }),
   };
 }
