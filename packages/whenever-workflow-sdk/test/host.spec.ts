@@ -10,7 +10,7 @@ import {
 
 function fakeIntegrations(): WorkflowIntegrations {
   return {
-    ai: { generateImage: vi.fn(), generateText: vi.fn() },
+    ai: { generateImage: vi.fn(), generateText: vi.fn(), generateVideo: vi.fn() },
     http: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn() },
     mcp: { read: vi.fn(), write: vi.fn() },
     postgres: { query: vi.fn() },

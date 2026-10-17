@@ -5,6 +5,8 @@ export type {
   AiGenerateTextCall,
   AiGenerateTextPort,
   AiGenerateTextRequest,
+  AiGenerateVideoPort,
+  AiGenerateVideoRequest,
   AiGenerationCall,
   AiIntegrationOptions,
   AiPromptRequest,
@@ -22,8 +24,10 @@ export {
   isAiConversationRequest,
   prepareAiGenerateImageInput,
   prepareAiGenerateTextInput,
+  prepareAiGenerateVideoInput,
   unavailableAiGenerateImage,
   unavailableAiGenerateText,
+  unavailableAiGenerateVideo,
 } from "./ai-integration";
 export type { GuardedFetchOptions, PinnedLookup, ResolveHost } from "./egress";
 export {

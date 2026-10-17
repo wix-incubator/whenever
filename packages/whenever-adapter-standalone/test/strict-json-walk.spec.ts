@@ -174,6 +174,12 @@ describe("the ports a workflow host is handed", () => {
         await ports.ai.generateImage({ prompt: "hello" }),
       "ai.generateImage",
     ],
+    [
+      "generateVideo",
+      async (ports: ReturnType<typeof integrations>) =>
+        await ports.ai.generateVideo({ prompt: "hello" }),
+      "ai.generateVideo",
+    ],
   ])("refuses %s when the host supplied no implementation", async (_case, call, operation) => {
     const ports = integrations({ fetch: vi.fn<FetchLike>() });
 

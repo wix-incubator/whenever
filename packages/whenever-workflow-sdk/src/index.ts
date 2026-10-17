@@ -14,7 +14,10 @@ export type {
   AiGenerateImageResult,
   AiGenerateTextInput,
   AiGenerateTextResult,
+  AiGenerateVideoInput,
+  AiGenerateVideoResult,
   AiGenerationSettings,
+  AiImageModel,
   AiIntegration,
   AiMessage,
   AiReasoningEffort,
@@ -26,6 +29,7 @@ export type {
   AiToolParameters,
   AiTools,
   AiUserMessage,
+  AiVideoModel,
   HttpIntegration,
   HttpRequestInput,
   HttpResponseResult,
@@ -39,7 +43,12 @@ export type {
   WorkflowIntegrations,
   WorkflowPostgres,
 } from "./integrations";
-export { AI_TEXT_MODELS, AI_TEXT_MODELS_WITHOUT_FORCED_TOOL_CHOICE } from "./integrations";
+export {
+  AI_IMAGE_MODELS,
+  AI_TEXT_MODELS,
+  AI_TEXT_MODELS_WITHOUT_FORCED_TOOL_CHOICE,
+  AI_VIDEO_MODELS,
+} from "./integrations";
 export type { CreateWorkflowContextOptions } from "./runtime";
 export { createWorkflowContext } from "./runtime";
 export type {
