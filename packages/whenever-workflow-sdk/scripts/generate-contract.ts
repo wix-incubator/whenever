@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -93,6 +94,10 @@ if (!providerKeys.includes("http")) {
   );
 }
 
+const { AI_TEXT_MODELS } = createRequire(import.meta.url)(
+  resolve(distDir, `${INTEGRATIONS_MODULE}.js`),
+) as { AI_TEXT_MODELS: readonly string[] };
+
 const declarations = modules
   .filter((moduleName: string) => !isIntegrationModule(moduleName))
   .map((moduleName: string) =>
@@ -125,6 +130,8 @@ ${declarations}
 ## Side effects (\`ctx.integrations\`)
 
 \`ctx.integrations\` is a \`WorkflowIntegrations\` port. The SDK itself declares ${providerKeys.join(", ")}. \`http\` and \`mcp\` take an address the author supplies; \`postgres\` and \`ai\` use host-supplied ports.
+
+\`ai.generateText\` takes an optional \`model\`, one of ${AI_TEXT_MODELS.map((model) => `\`"${model}"\``).join(", ")} (\`AI_TEXT_MODELS\`), and an optional \`reasoningEffort\` of \`"low"\`, \`"medium"\` or \`"high"\`. Omit either for the host's default.
 
 Every other provider operation comes from a binding supplied by the host. Its input and result types are declared as a \`WorkflowIntegrations\` augmentation, which is what makes \`ctx.integrations.<toolkit>.<operation>\` compile. An operation that has not been bound in this workspace neither typechecks nor runs, so bind it before writing the call — and take the call and the types from what the bind returned rather than restating them.
 

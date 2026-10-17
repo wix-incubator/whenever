@@ -1,4 +1,4 @@
-import { NonRetryableError, RetryableError } from "@wix/whenever-workflow-sdk";
+import { AI_TEXT_MODELS, NonRetryableError, RetryableError } from "@wix/whenever-workflow-sdk";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -216,6 +216,59 @@ describe("a prompt with a standing instruction", () => {
     await expect(
       integration.generateText({ prompt: "Hi.", system } as never),
     ).rejects.toMatchObject({ code: "INVALID_AI_REQUEST", retryable: false });
+    expect(generateText).not.toHaveBeenCalled();
+  });
+});
+
+describe("a call choosing its model and reasoning effort", () => {
+  it.each([
+    ...AI_TEXT_MODELS.map((model) => ({
+      shape: `a prompt call on ${model}`,
+      input: { prompt: "Hi.", model, reasoningEffort: "low" },
+    })),
+    {
+      shape: "a conversation",
+      input: {
+        messages: [{ role: "user", content: "Hi." }],
+        model: AI_TEXT_MODELS[0],
+        reasoningEffort: "medium",
+      },
+    },
+  ])("hands both to the port on $shape", async ({ input }) => {
+    const generateText = generating("Hello.");
+    const integration = createAiIntegration({
+      generateImage: unavailableAiGenerateImage(),
+      generateText,
+    });
+
+    await integration.generateText(input as never);
+
+    expect(generateText).toHaveBeenCalledWith(input, {});
+  });
+
+  it.each([
+    { when: "the effort is max", input: { prompt: "Hi.", reasoningEffort: "max" } },
+    {
+      when: "a conversation's effort is not a string",
+      input: { messages: [{ role: "user", content: "Hi." }], reasoningEffort: 2 },
+    },
+    { when: "the model is not a string", input: { prompt: "Hi.", model: 42 } },
+    { when: "the model is not offered", input: { prompt: "Hi.", model: "vendor/some-model" } },
+    {
+      when: "a conversation's model differs from an offered one only in case",
+      input: { messages: [{ role: "user", content: "Hi." }], model: AI_TEXT_MODELS[0].toUpperCase() },
+    },
+  ])("refuses the call before reaching a model when $when", async ({ input }) => {
+    const generateText = generating("never");
+    const integration = createAiIntegration({
+      generateImage: unavailableAiGenerateImage(),
+      generateText,
+    });
+
+    await expect(integration.generateText(input as never)).rejects.toMatchObject({
+      code: "INVALID_AI_REQUEST",
+      retryable: false,
+    });
     expect(generateText).not.toHaveBeenCalled();
   });
 });

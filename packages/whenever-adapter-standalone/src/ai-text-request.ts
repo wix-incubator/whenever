@@ -1,5 +1,9 @@
 import {
+  AI_TEXT_MODELS,
+  type AiGenerationSettings,
   type AiMessage,
+  type AiReasoningEffort,
+  type AiTextModel,
   type AiTool,
   type AiToolCall,
   type AiToolChoice,
@@ -14,13 +18,14 @@ export const AI_CONVERSATION_MESSAGE_LIMIT = 200;
 export const AI_TOOL_LIMIT = 64;
 
 const TOOL_NAME = /^[A-Za-z0-9_-]{1,64}$/u;
+export const AI_REASONING_EFFORTS: readonly AiReasoningEffort[] = ["low", "medium", "high"];
 
-export interface AiPromptRequest {
+export interface AiPromptRequest extends Readonly<AiGenerationSettings> {
   readonly prompt: string;
   readonly system?: string;
 }
 
-export interface AiConversationRequest {
+export interface AiConversationRequest extends Readonly<AiGenerationSettings> {
   readonly system?: string;
   readonly messages: readonly AiMessage[];
   readonly tools?: AiTools;
@@ -90,22 +95,45 @@ function text(value: unknown, name: string): string {
   return value;
 }
 
+function prepareSettings(fields: Record<string, unknown>): AiGenerationSettings {
+  const model = fields.model;
+  if (model !== undefined && !AI_TEXT_MODELS.includes(model as AiTextModel)) {
+    throw invalid(`model must be one of ${AI_TEXT_MODELS.map((value) => JSON.stringify(value)).join(", ")}`);
+  }
+  const effort = fields.reasoningEffort;
+  if (effort !== undefined && !AI_REASONING_EFFORTS.includes(effort as AiReasoningEffort)) {
+    throw invalid(`reasoningEffort must be ${AI_REASONING_EFFORTS.map((value) => JSON.stringify(value)).join(", ")}`);
+  }
+  return {
+    ...(model === undefined ? {} : { model: model as AiTextModel }),
+    ...(effort === undefined ? {} : { reasoningEffort: effort as AiReasoningEffort }),
+  };
+}
+
 export function prepareAiTextRequest(input: unknown): AiGenerateTextRequest {
   if (!isPlainRecord(input)) throw invalid("input must be an object");
   const fields = definedEntries(input);
   if ("messages" in fields) return prepareConversation(fields);
-  requireOnlyKeys(fields, ["prompt", "system"], "a prompt call");
+  requireOnlyKeys(fields, ["prompt", "system", "model", "reasoningEffort"], "a prompt call");
   const prompt = nonEmptyText(fields.prompt, "prompt");
   const system =
     fields.system === undefined ? undefined : nonEmptyText(fields.system, "system");
   if (prompt.length + (system?.length ?? 0) > AI_PROMPT_LIMIT_CHARACTERS) {
     throw invalid(`prompt exceeds ${String(AI_PROMPT_LIMIT_CHARACTERS)} characters`);
   }
-  return system === undefined ? { prompt } : { prompt, system };
+  return {
+    prompt,
+    ...(system === undefined ? {} : { system }),
+    ...prepareSettings(fields),
+  };
 }
 
 function prepareConversation(fields: Record<string, unknown>): AiConversationRequest {
-  requireOnlyKeys(fields, ["system", "messages", "tools", "toolChoice"], "a conversation");
+  requireOnlyKeys(
+    fields,
+    ["system", "messages", "tools", "toolChoice", "model", "reasoningEffort"],
+    "a conversation",
+  );
   const system =
     fields.system === undefined ? undefined : nonEmptyText(fields.system, "system");
   const tools = fields.tools === undefined ? undefined : prepareTools(fields.tools);
@@ -133,6 +161,7 @@ function prepareConversation(fields: Record<string, unknown>): AiConversationReq
     messages,
     ...(tools === undefined ? {} : { tools }),
     ...(toolChoice === undefined ? {} : { toolChoice }),
+    ...prepareSettings(fields),
   };
 }
 
