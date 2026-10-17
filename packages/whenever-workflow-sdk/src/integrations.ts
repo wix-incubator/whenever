@@ -3,15 +3,29 @@ export type AiReasoningEffort = "low" | "medium" | "high";
 
 /** The models `ai.generateText` can run on. */
 export const AI_TEXT_MODELS = [
+  "anthropic/claude-haiku-5.5",
   "anthropic/claude-opus-5",
+  "anthropic/claude-opus-5.5",
   "anthropic/claude-sonnet-5",
+  "anthropic/claude-sonnet-5.5",
+  "google/gemini-3.1-pro",
   "google/gemini-3.5-flash",
+  "google/gemini-3.8-flash",
+  "google/gemini-4-argon",
   "openai/gpt-5.4-mini",
   "openai/gpt-5.6-luna",
+  "openai/gpt-6-luna",
   "openai/gpt-6-sol",
+  "openai/gpt-6.1-sol",
 ] as const;
 
 export type AiTextModel = (typeof AI_TEXT_MODELS)[number];
+
+/** Models that cannot be forced to call a tool: use `toolChoice: "auto"` or omit it with them. */
+export const AI_TEXT_MODELS_WITHOUT_FORCED_TOOL_CHOICE = [
+  "anthropic/claude-opus-5.5",
+  "anthropic/claude-sonnet-5.5",
+] as const satisfies readonly AiTextModel[];
 
 /** Settings every text generation accepts. Omit them for the host's defaults. */
 export interface AiGenerationSettings {

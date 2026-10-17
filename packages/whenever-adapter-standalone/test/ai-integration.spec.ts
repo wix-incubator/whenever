@@ -1,4 +1,9 @@
-import { AI_TEXT_MODELS, NonRetryableError, RetryableError } from "@wix/whenever-workflow-sdk";
+import {
+  AI_TEXT_MODELS,
+  AI_TEXT_MODELS_WITHOUT_FORCED_TOOL_CHOICE,
+  NonRetryableError,
+  RetryableError,
+} from "@wix/whenever-workflow-sdk";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -270,6 +275,43 @@ describe("a call choosing its model and reasoning effort", () => {
       retryable: false,
     });
     expect(generateText).not.toHaveBeenCalled();
+  });
+
+  const FORCED_CHOICES = ["required", { name: "getIssue" }] as const;
+  const forcedOn = (model: string, toolChoice: unknown): unknown => ({
+    messages: [{ role: "user", content: "Close ABC-1." }],
+    tools: { getIssue: GET_ISSUE },
+    toolChoice,
+    model,
+  });
+
+  it.each(
+    AI_TEXT_MODELS_WITHOUT_FORCED_TOOL_CHOICE.flatMap((model) =>
+      FORCED_CHOICES.map((toolChoice) => ({ model, toolChoice })),
+    ),
+  )("refuses forcing $model to call a tool with $toolChoice", async ({ model, toolChoice }) => {
+    const generateText = generating("never");
+    const integration = createAiIntegration({ generateImage: unavailableAiGenerateImage(), generateText });
+
+    await expect(integration.generateText(forcedOn(model, toolChoice) as never)).rejects.toMatchObject({
+      code: "INVALID_AI_REQUEST",
+      retryable: false,
+    });
+    expect(generateText).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ...AI_TEXT_MODELS_WITHOUT_FORCED_TOOL_CHOICE.map((model) => ({ model, toolChoice: "auto" })),
+    ...AI_TEXT_MODELS.filter(
+      (model) => !(AI_TEXT_MODELS_WITHOUT_FORCED_TOOL_CHOICE as readonly string[]).includes(model),
+    ).map((model) => ({ model, toolChoice: "required" })),
+  ])("hands $model a $toolChoice tool choice", async ({ model, toolChoice }) => {
+    const generateText = generating("Hello.");
+    const integration = createAiIntegration({ generateImage: unavailableAiGenerateImage(), generateText });
+
+    await integration.generateText(forcedOn(model, toolChoice) as never);
+
+    expect(generateText).toHaveBeenCalledWith(expect.objectContaining({ model, toolChoice }), {});
   });
 });
 

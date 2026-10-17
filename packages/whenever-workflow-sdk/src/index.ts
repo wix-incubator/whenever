@@ -39,7 +39,7 @@ export type {
   WorkflowIntegrations,
   WorkflowPostgres,
 } from "./integrations";
-export { AI_TEXT_MODELS } from "./integrations";
+export { AI_TEXT_MODELS, AI_TEXT_MODELS_WITHOUT_FORCED_TOOL_CHOICE } from "./integrations";
 export type { CreateWorkflowContextOptions } from "./runtime";
 export { createWorkflowContext } from "./runtime";
 export type {
