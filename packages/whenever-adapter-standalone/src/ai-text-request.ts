@@ -1,5 +1,6 @@
 import {
   AI_TEXT_MODELS,
+  AI_TEXT_MODELS_WITHOUT_FORCED_TOOL_CHOICE,
   type AiGenerationSettings,
   type AiMessage,
   type AiReasoningEffort,
@@ -156,12 +157,23 @@ function prepareConversation(fields: Record<string, unknown>): AiConversationReq
     );
   }
 
+  const settings = prepareSettings(fields);
+  if (
+    toolChoice !== undefined &&
+    toolChoice !== "auto" &&
+    (AI_TEXT_MODELS_WITHOUT_FORCED_TOOL_CHOICE as readonly AiTextModel[]).some(
+      (model) => model === settings.model,
+    )
+  ) {
+    throw invalid(`${String(settings.model)} cannot be forced to call a tool; use toolChoice "auto" or another model`);
+  }
+
   return {
     ...(system === undefined ? {} : { system }),
     messages,
     ...(tools === undefined ? {} : { tools }),
     ...(toolChoice === undefined ? {} : { toolChoice }),
-    ...prepareSettings(fields),
+    ...settings,
   };
 }
 
