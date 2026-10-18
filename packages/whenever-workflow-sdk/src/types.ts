@@ -147,7 +147,6 @@ export interface WebhookTrigger {
   key: string;
   auth?: WebhookAuth;
   provider?: WebhookProvider;
-  event?: string;
 }
 
 export interface EventTrigger {

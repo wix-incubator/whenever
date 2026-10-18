@@ -16,16 +16,8 @@ function providerWebhook(provider: WebhookProvider, identity: WebhookIdentity, a
   return trigger;
 }
 
-function signedWebhook(provider: WebhookProvider, identity: WebhookIdentity, event?: string): WebhookTrigger {
-  const trigger = providerWebhook(provider, identity, "signature");
-  if (event !== undefined) {
-    const selected = event.trim();
-    if (selected === "") {
-      throw new Error("invalid webhook event: expected a non-empty event name from the sender's own vocabulary");
-    }
-    trigger.event = selected;
-  }
-  return trigger;
+function signedWebhook(provider: WebhookProvider, identity: WebhookIdentity): WebhookTrigger {
+  return providerWebhook(provider, identity, "signature");
 }
 
 /**
@@ -43,15 +35,16 @@ export function metaAppWhatsAppWebhook(options: WebhookIdentity): WebhookTrigger
 
 /**
  * Events from a Slack app's Event Subscriptions. The host must verify deliveries with the Slack
- * signing secret and drop the bot's own messages. `event`
- * narrows the endpoint to one Slack event, named in Slack's vocabulary: `"app_mention"`, not
- * `"slack.app_mention"`.
+ * signing secret and drop the bot's own messages.
+ *
+ * Receives every Slack Events API event the app subscribes to; branch on `ctx.input.event.type`.
+ * Subscribe only the bot events you handle — each delivery starts a run.
  *
  * @see https://api.slack.com/apis/events-api
  * @see https://api.slack.com/authentication/verifying-requests-from-slack
  */
-export function slackAppEventsWebhook(options: WebhookIdentity & { event?: string }): WebhookTrigger {
-  return signedWebhook("slack", options, options.event);
+export function slackAppEventsWebhook(options: WebhookIdentity): WebhookTrigger {
+  return signedWebhook("slack", options);
 }
 
 /**

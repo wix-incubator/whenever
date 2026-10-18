@@ -345,7 +345,9 @@ test("an unnarrowed delivery field reads as absent rather than failing to compil
 
 test("a provider helper takes only the endpoint's identity, never a secret", () => {
   expectTypeOf(metaAppWhatsAppWebhook({ key: "wa" })).toEqualTypeOf<WebhookTrigger>();
-  expectTypeOf(slackAppEventsWebhook({ key: "mentions", event: "app_mention" })).toEqualTypeOf<WebhookTrigger>();
+  expectTypeOf(slackAppEventsWebhook({ key: "events" })).toEqualTypeOf<WebhookTrigger>();
+  // @ts-expect-error Slack delivers every subscribed event; there is no event selector
+  slackAppEventsWebhook({ key: "mentions", event: "app_mention" });
   // @ts-expect-error the host supplies signing credentials, not the declaration
   stripeWebhook({ key: "s", signingSecret: "whsec_x" });
   // @ts-expect-error a helper fixes its provider, so another cannot be passed
@@ -380,10 +382,6 @@ test("WebhookTrigger provider is a WebhookProvider or undefined", () => {
 
 test("WebhookTrigger key is required", () => {
   expectTypeOf<WebhookTrigger["key"]>().toEqualTypeOf<string>();
-});
-
-test("WebhookTrigger event is an optional sender event name", () => {
-  expectTypeOf<WebhookTrigger["event"]>().toEqualTypeOf<string | undefined>();
 });
 
 test("WebhookAuth enumerates the webhook auth modes", () => {
