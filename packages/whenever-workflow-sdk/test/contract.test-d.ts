@@ -264,6 +264,24 @@ test("workflow context exposes a typed AI image generation integration", () => {
     .toEqualTypeOf<AiGenerateVideoInput>();
 });
 
+test("image and video generation choose only the supported settings", () => {
+  const ctx = {} as WorkflowContext;
+
+  void ctx.integrations.ai.generateImage({ prompt: "Square.", aspectRatio: "1:1" });
+  void ctx.integrations.ai.generateVideo({
+    prompt: "Vertical clip.",
+    aspectRatio: "9:16",
+    durationSeconds: 6,
+    resolution: "1080p",
+  });
+  // @ts-expect-error aspect ratios are limited to the supported set
+  void ctx.integrations.ai.generateImage({ prompt: "Wide.", aspectRatio: "4:3" });
+  // @ts-expect-error resolutions are limited to the supported set
+  void ctx.integrations.ai.generateVideo({ prompt: "Sharp.", resolution: "4k" });
+  // @ts-expect-error images have no duration
+  void ctx.integrations.ai.generateImage({ prompt: "Still.", durationSeconds: 5 });
+});
+
 test("workflow context exposes a typed database query integration", () => {
   const ctx = {} as WorkflowContext;
 

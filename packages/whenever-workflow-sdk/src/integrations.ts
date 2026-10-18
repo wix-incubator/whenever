@@ -151,18 +151,32 @@ export const AI_VIDEO_MODELS = [
 
 export type AiVideoModel = (typeof AI_VIDEO_MODELS)[number];
 
+export const AI_ASPECT_RATIOS = ["1:1", "16:9", "9:16"] as const;
+
+export type AiAspectRatio = (typeof AI_ASPECT_RATIOS)[number];
+
+export const AI_VIDEO_RESOLUTIONS = ["720p", "1080p"] as const;
+
+export type AiVideoResolution = (typeof AI_VIDEO_RESOLUTIONS)[number];
+
+/** Omit a setting for the host's default; a combination the chosen model cannot render is refused. */
 export interface AiGenerateImageInput {
   prompt: string;
   model?: AiImageModel;
+  aspectRatio?: AiAspectRatio;
 }
 
 export interface AiGenerateImageResult {
   imageUrl: string;
 }
 
+/** Omit a setting for the host's default; a combination the chosen model cannot render is refused. */
 export interface AiGenerateVideoInput {
   prompt: string;
   model?: AiVideoModel;
+  aspectRatio?: AiAspectRatio;
+  durationSeconds?: number;
+  resolution?: AiVideoResolution;
 }
 
 export interface AiGenerateVideoResult {

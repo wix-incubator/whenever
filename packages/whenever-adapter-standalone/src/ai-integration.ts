@@ -1,11 +1,15 @@
 import {
+  AI_ASPECT_RATIOS,
   AI_IMAGE_MODELS,
   AI_VIDEO_MODELS,
+  AI_VIDEO_RESOLUTIONS,
+  type AiAspectRatio,
   type AiConversationResult,
   type AiImageModel,
   type AiIntegration,
   type AiToolCall,
   type AiVideoModel,
+  type AiVideoResolution,
   NonRetryableError,
   RetryableError,
 } from "@wix/whenever-workflow-sdk";
@@ -36,12 +40,19 @@ export {
 export interface AiGenerateImageRequest {
   readonly prompt: string;
   readonly model?: AiImageModel;
+  readonly aspectRatio?: AiAspectRatio;
 }
 
 export interface AiGenerateVideoRequest {
   readonly prompt: string;
   readonly model?: AiVideoModel;
+  readonly aspectRatio?: AiAspectRatio;
+  readonly durationSeconds?: number;
+  readonly resolution?: AiVideoResolution;
 }
+
+/** Longest clip any host can be asked for; which lengths a model accepts is the host's call. */
+export const AI_VIDEO_DURATION_LIMIT_SECONDS = 60;
 
 export interface AiGenerationCall {
   readonly timeoutMs?: number;
@@ -92,15 +103,35 @@ export function prepareAiGenerateTextInput(input: unknown): AiGenerateTextReques
   return prepareAiTextRequest(input);
 }
 
+function oneOf<TValue extends string>(
+  kind: "image" | "video",
+  field: string,
+  values: readonly TValue[],
+  value: unknown,
+): TValue | undefined {
+  if (value === undefined) return undefined;
+  if (!values.includes(value as TValue)) {
+    throw invalidAiRequest(
+      kind,
+      `${field} must be one of ${values.map((item) => JSON.stringify(item)).join(", ")}`,
+    );
+  }
+  return value as TValue;
+}
+
 function prepareAiMediaRequest<TModel extends string>(
   kind: "image" | "video",
   models: readonly TModel[],
   input: unknown,
-): { readonly prompt: string; readonly model?: TModel } {
+): {
+  readonly prompt: string;
+  readonly model?: TModel;
+  readonly aspectRatio?: AiAspectRatio;
+} {
   if (!isPlainRecord(input)) {
     throw invalidAiRequest(kind, "input must be an object");
   }
-  const { prompt, model } = input;
+  const { prompt } = input;
   if (typeof prompt !== "string" || !prompt.trim()) {
     throw invalidAiRequest(kind, "prompt must be a non-empty string");
   }
@@ -110,14 +141,13 @@ function prepareAiMediaRequest<TModel extends string>(
       `prompt exceeds ${String(AI_PROMPT_LIMIT_CHARACTERS)} characters`,
     );
   }
-  if (model === undefined) return { prompt };
-  if (!models.includes(model as TModel)) {
-    throw invalidAiRequest(
-      kind,
-      `model must be one of ${models.map((value) => JSON.stringify(value)).join(", ")}`,
-    );
-  }
-  return { prompt, model: model as TModel };
+  const model = oneOf(kind, "model", models, input.model);
+  const aspectRatio = oneOf(kind, "aspectRatio", AI_ASPECT_RATIOS, input.aspectRatio);
+  return {
+    prompt,
+    ...(model === undefined ? {} : { model }),
+    ...(aspectRatio === undefined ? {} : { aspectRatio }),
+  };
 }
 
 export function prepareAiGenerateImageInput(
@@ -129,7 +159,31 @@ export function prepareAiGenerateImageInput(
 export function prepareAiGenerateVideoInput(
   input: unknown,
 ): AiGenerateVideoRequest {
-  return prepareAiMediaRequest("video", AI_VIDEO_MODELS, input);
+  const request = prepareAiMediaRequest("video", AI_VIDEO_MODELS, input);
+  const { durationSeconds } = input as Record<string, unknown>;
+  if (
+    durationSeconds !== undefined &&
+    (typeof durationSeconds !== "number" ||
+      !Number.isInteger(durationSeconds) ||
+      durationSeconds <= 0 ||
+      durationSeconds > AI_VIDEO_DURATION_LIMIT_SECONDS)
+  ) {
+    throw invalidAiRequest(
+      "video",
+      `durationSeconds must be a whole number from 1 to ${String(AI_VIDEO_DURATION_LIMIT_SECONDS)}`,
+    );
+  }
+  const resolution = oneOf(
+    "video",
+    "resolution",
+    AI_VIDEO_RESOLUTIONS,
+    (input as Record<string, unknown>).resolution,
+  );
+  return {
+    ...request,
+    ...(durationSeconds === undefined ? {} : { durationSeconds }),
+    ...(resolution === undefined ? {} : { resolution }),
+  };
 }
 
 function emptyTextGeneration(): RetryableError {
