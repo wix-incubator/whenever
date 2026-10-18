@@ -23,6 +23,7 @@ import {
   stripeWebhook,
   supabaseDatabaseWebhook,
   telegramBotWebhook,
+  vercelWebhook,
   wixAppWebhook,
   wixAutomationsWebhook,
 } from "../src/webhooks";
@@ -248,6 +249,7 @@ const HELPERS = [
   { helper: "standardWebhook", build: standardWebhook, provider: "standard-webhooks" },
   { helper: "telegramBotWebhook", build: telegramBotWebhook, provider: "telegram" },
   { helper: "supabaseDatabaseWebhook", build: supabaseDatabaseWebhook, provider: "supabase" },
+  { helper: "vercelWebhook", build: vercelWebhook, provider: "vercel" },
   { helper: "discordAppInteractionsWebhook", build: discordAppInteractionsWebhook, provider: "discord" },
   { helper: "discordAppEventsWebhook", build: discordAppEventsWebhook, provider: "discord-events" },
   { helper: "wixAppWebhook", build: wixAppWebhook, provider: "wix-app" },
