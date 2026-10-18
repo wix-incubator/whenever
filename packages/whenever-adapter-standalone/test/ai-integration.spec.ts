@@ -78,6 +78,63 @@ describe("createAiIntegration", () => {
     );
   });
 
+  it("hands the chosen media settings to the image and video ports", async () => {
+    const generateImage = generatingImage("https://images.example.test/wide.png");
+    const generateVideo = generatingVideo("https://videos.example.test/tall.mp4");
+    const integration = createAiIntegration({
+      generateImage,
+      generateText: generating("unused"),
+      generateVideo,
+    });
+
+    await integration.generateImage({ prompt: "Wide.", aspectRatio: "16:9" });
+    await integration.generateVideo({
+      prompt: "Tall.",
+      aspectRatio: "9:16",
+      durationSeconds: 6,
+      resolution: "1080p",
+    });
+
+    expect(generateImage).toHaveBeenCalledWith(
+      { prompt: "Wide.", aspectRatio: "16:9" },
+      {},
+    );
+    expect(generateVideo).toHaveBeenCalledWith(
+      { prompt: "Tall.", aspectRatio: "9:16", durationSeconds: 6, resolution: "1080p" },
+      {},
+    );
+  });
+
+  it.each([
+    { when: "the image aspect ratio is unsupported", kind: "image", input: { prompt: "p", aspectRatio: "4:3" } },
+    { when: "the video aspect ratio is unsupported", kind: "video", input: { prompt: "p", aspectRatio: "21:9" } },
+    { when: "the resolution is unsupported", kind: "video", input: { prompt: "p", resolution: "4k" } },
+    { when: "the duration is fractional", kind: "video", input: { prompt: "p", durationSeconds: 4.5 } },
+    { when: "the duration is zero", kind: "video", input: { prompt: "p", durationSeconds: 0 } },
+    { when: "the duration is too long", kind: "video", input: { prompt: "p", durationSeconds: 61 } },
+    { when: "the duration is not a number", kind: "video", input: { prompt: "p", durationSeconds: "8" } },
+  ] as const)("refuses media generation before reaching a model when $when", async ({ kind, input }) => {
+    const generateImage = generatingImage("never");
+    const generateVideo = generatingVideo("never");
+    const integration = createAiIntegration({
+      generateImage,
+      generateText: generating("never"),
+      generateVideo,
+    });
+
+    const call =
+      kind === "image"
+        ? integration.generateImage(input as never)
+        : integration.generateVideo(input as never);
+
+    await expect(call).rejects.toMatchObject({
+      code: "INVALID_AI_REQUEST",
+      retryable: false,
+    });
+    expect(generateImage).not.toHaveBeenCalled();
+    expect(generateVideo).not.toHaveBeenCalled();
+  });
+
   it("hands the validated prompt to the port and returns only its text", async () => {
     const generateText = generating("A short summary.");
     const integration = createAiIntegration({

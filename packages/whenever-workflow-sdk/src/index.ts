@@ -4,6 +4,7 @@ export { defineWorkflow, isWorkflowDefinition } from "./define-workflow";
 export type { RetryableErrorOptions, WorkflowErrorOptions } from "./errors";
 export { NonRetryableError, RetryableError, WorkflowError } from "./errors";
 export type {
+  AiAspectRatio,
   AiAssistantMessage,
   AiConversationInput,
   AiConversationResult,
@@ -30,6 +31,7 @@ export type {
   AiTools,
   AiUserMessage,
   AiVideoModel,
+  AiVideoResolution,
   HttpIntegration,
   HttpRequestInput,
   HttpResponseResult,
@@ -44,10 +46,12 @@ export type {
   WorkflowPostgres,
 } from "./integrations";
 export {
+  AI_ASPECT_RATIOS,
   AI_IMAGE_MODELS,
   AI_TEXT_MODELS,
   AI_TEXT_MODELS_WITHOUT_FORCED_TOOL_CHOICE,
   AI_VIDEO_MODELS,
+  AI_VIDEO_RESOLUTIONS,
 } from "./integrations";
 export type { CreateWorkflowContextOptions } from "./runtime";
 export { createWorkflowContext } from "./runtime";
