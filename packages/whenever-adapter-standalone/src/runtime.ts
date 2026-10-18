@@ -3,9 +3,11 @@ import type { WorkflowIntegrations } from "@wix/whenever-workflow-sdk";
 import {
   type AiGenerateImagePort,
   type AiGenerateTextPort,
+  type AiGenerateVideoPort,
   createAiIntegration,
   unavailableAiGenerateImage,
   unavailableAiGenerateText,
+  unavailableAiGenerateVideo,
 } from "./ai-integration";
 import { type ResolveHost } from "./egress";
 import type { FetchLike } from "./http";
@@ -24,6 +26,7 @@ export interface CreateWorkflowIntegrationsFromEnvOptions {
   resolveHost?: ResolveHost;
   generateImage?: AiGenerateImagePort;
   generateText?: AiGenerateTextPort;
+  generateVideo?: AiGenerateVideoPort;
   queryPostgres?: PostgresQueryPort;
 }
 
@@ -39,6 +42,7 @@ export function createWorkflowIntegrationsFromEnv(
     ai: createAiIntegration({
       generateImage: options.generateImage ?? unavailableAiGenerateImage(),
       generateText: options.generateText ?? unavailableAiGenerateText(),
+      generateVideo: options.generateVideo ?? unavailableAiGenerateVideo(),
     }),
     http: createHttpIntegrationFromEnv({
       fetch: fetchImplementation,

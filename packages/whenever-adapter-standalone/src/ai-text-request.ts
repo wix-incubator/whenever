@@ -42,7 +42,7 @@ export function isAiConversationRequest(
 }
 
 export function invalidAiRequest(
-  kind: "image" | "text",
+  kind: "image" | "text" | "video",
   message: string,
 ): NonRetryableError {
   return new NonRetryableError(`Invalid AI ${kind} generation: ${message}.`, {

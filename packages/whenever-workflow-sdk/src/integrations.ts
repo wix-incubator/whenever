@@ -135,12 +135,38 @@ export type AiConversationResult<TName extends string = string> =
     })
   | AiConversationToolCallsResult<TName>;
 
+/** The models `ai.generateImage` can run on. */
+export const AI_IMAGE_MODELS = [
+  "google/nano-banana-2.1",
+  "openai/gpt-image-2.5",
+] as const;
+
+export type AiImageModel = (typeof AI_IMAGE_MODELS)[number];
+
+/** The models `ai.generateVideo` can run on. */
+export const AI_VIDEO_MODELS = [
+  "google/veo-3.1-fast",
+  "kling/kling-3.0-pro",
+] as const;
+
+export type AiVideoModel = (typeof AI_VIDEO_MODELS)[number];
+
 export interface AiGenerateImageInput {
   prompt: string;
+  model?: AiImageModel;
 }
 
 export interface AiGenerateImageResult {
   imageUrl: string;
+}
+
+export interface AiGenerateVideoInput {
+  prompt: string;
+  model?: AiVideoModel;
+}
+
+export interface AiGenerateVideoResult {
+  videoUrl: string;
 }
 
 export interface AiIntegration {
@@ -169,12 +195,11 @@ export interface AiIntegration {
     input: AiConversationInput<TTools>,
   ): Promise<AiConversationResult<keyof TTools & string>>;
 
-  /**
-   * Generates one image from a prompt and returns its URL. Put the complete visual description in
-   * `prompt`, and read the generated image from `result.imageUrl`. The host supplies the generation
-   * implementation and configures its model, image settings and deadlines.
-   */
+  /** One image from a complete visual prompt; `result.imageUrl` opens for anyone holding it. */
   generateImage(input: AiGenerateImageInput): Promise<AiGenerateImageResult>;
+
+  /** One short clip from a complete scene prompt, in minutes; `result.videoUrl` opens for anyone holding it. */
+  generateVideo(input: AiGenerateVideoInput): Promise<AiGenerateVideoResult>;
 }
 
 export interface HttpRequestInput {

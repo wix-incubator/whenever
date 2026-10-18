@@ -1,6 +1,8 @@
 import {
+  AI_IMAGE_MODELS,
   AI_TEXT_MODELS,
   AI_TEXT_MODELS_WITHOUT_FORCED_TOOL_CHOICE,
+  AI_VIDEO_MODELS,
   NonRetryableError,
   RetryableError,
 } from "@wix/whenever-workflow-sdk";
@@ -13,9 +15,11 @@ import {
   AI_TOOL_LIMIT,
   type AiGenerateImagePort,
   type AiGenerateTextPort,
+  type AiGenerateVideoPort,
   createAiIntegration,
   unavailableAiGenerateImage,
   unavailableAiGenerateText,
+  unavailableAiGenerateVideo,
 } from "../src/ai-integration";
 import { createWorkflowIntegrationsFromEnv } from "../src/runtime";
 
@@ -27,6 +31,10 @@ function generatingImage(imageUrl: string): AiGenerateImagePort {
   return vi.fn<AiGenerateImagePort>(async () => ({ imageUrl }));
 }
 
+function generatingVideo(videoUrl: string): AiGenerateVideoPort {
+  return vi.fn<AiGenerateVideoPort>(async () => ({ videoUrl }));
+}
+
 describe("createAiIntegration", () => {
   it("keeps the port's usage out of what the workflow receives", async () => {
     const usage = { model: "model-1", microcents: 1234 };
@@ -36,6 +44,7 @@ describe("createAiIntegration", () => {
         usage,
       })),
       generateText: vi.fn<AiGenerateTextPort>(async () => ({ text: "done", usage })),
+      generateVideo: unavailableAiGenerateVideo(),
     });
 
     await expect(integration.generateText({ prompt: "Say done." })).resolves.toEqual({
@@ -53,6 +62,7 @@ describe("createAiIntegration", () => {
     const integration = createAiIntegration({
       generateImage,
       generateText: generating("unused"),
+      generateVideo: unavailableAiGenerateVideo(),
     });
 
     const result = await integration.generateImage({
@@ -73,6 +83,7 @@ describe("createAiIntegration", () => {
     const integration = createAiIntegration({
       generateImage: unavailableAiGenerateImage(),
       generateText,
+      generateVideo: unavailableAiGenerateVideo(),
     });
 
     const result = await integration.generateText({
@@ -92,6 +103,7 @@ describe("createAiIntegration", () => {
     const integration = createAiIntegration({
       generateImage: unavailableAiGenerateImage(),
       generateText,
+      generateVideo: unavailableAiGenerateVideo(),
       timeoutMs: 25_000,
       signal,
     });
@@ -115,6 +127,7 @@ describe("createAiIntegration", () => {
     const integration = createAiIntegration({
       generateImage: unavailableAiGenerateImage(),
       generateText,
+      generateVideo: unavailableAiGenerateVideo(),
     });
 
     await expect(integration.generateText(input as never)).rejects.toMatchObject(
@@ -128,6 +141,7 @@ describe("createAiIntegration", () => {
     const integration = createAiIntegration({
       generateImage: unavailableAiGenerateImage(),
       generateText,
+      generateVideo: unavailableAiGenerateVideo(),
     });
 
     await expect(
@@ -149,6 +163,7 @@ describe("createAiIntegration", () => {
     const integration = createAiIntegration({
       generateImage: unavailableAiGenerateImage(),
       generateText: (async () => value) as unknown as AiGenerateTextPort,
+      generateVideo: unavailableAiGenerateVideo(),
     });
 
     await expect(
@@ -162,6 +177,7 @@ describe("createAiIntegration", () => {
     });
     const integration = createAiIntegration({
       generateImage: unavailableAiGenerateImage(),
+      generateVideo: unavailableAiGenerateVideo(),
       generateText: () => {
         throw failure;
       },
@@ -178,6 +194,7 @@ describe("createAiIntegration", () => {
       const integration = createAiIntegration({
         generateImage: (async () => value) as unknown as AiGenerateImagePort,
         generateText: generating("unused"),
+        generateVideo: unavailableAiGenerateVideo(),
       });
 
       await expect(
@@ -196,6 +213,7 @@ describe("a prompt with a standing instruction", () => {
     const integration = createAiIntegration({
       generateImage: unavailableAiGenerateImage(),
       generateText,
+      generateVideo: unavailableAiGenerateVideo(),
     });
 
     await expect(
@@ -216,6 +234,7 @@ describe("a prompt with a standing instruction", () => {
     const integration = createAiIntegration({
       generateImage: unavailableAiGenerateImage(),
       generateText,
+      generateVideo: unavailableAiGenerateVideo(),
     });
 
     await expect(
@@ -244,6 +263,7 @@ describe("a call choosing its model and reasoning effort", () => {
     const integration = createAiIntegration({
       generateImage: unavailableAiGenerateImage(),
       generateText,
+      generateVideo: unavailableAiGenerateVideo(),
     });
 
     await integration.generateText(input as never);
@@ -268,6 +288,7 @@ describe("a call choosing its model and reasoning effort", () => {
     const integration = createAiIntegration({
       generateImage: unavailableAiGenerateImage(),
       generateText,
+      generateVideo: unavailableAiGenerateVideo(),
     });
 
     await expect(integration.generateText(input as never)).rejects.toMatchObject({
@@ -291,7 +312,11 @@ describe("a call choosing its model and reasoning effort", () => {
     ),
   )("refuses forcing $model to call a tool with $toolChoice", async ({ model, toolChoice }) => {
     const generateText = generating("never");
-    const integration = createAiIntegration({ generateImage: unavailableAiGenerateImage(), generateText });
+    const integration = createAiIntegration({
+      generateImage: unavailableAiGenerateImage(),
+      generateText,
+      generateVideo: unavailableAiGenerateVideo(),
+    });
 
     await expect(integration.generateText(forcedOn(model, toolChoice) as never)).rejects.toMatchObject({
       code: "INVALID_AI_REQUEST",
@@ -307,7 +332,11 @@ describe("a call choosing its model and reasoning effort", () => {
     ).map((model) => ({ model, toolChoice: "required" })),
   ])("hands $model a $toolChoice tool choice", async ({ model, toolChoice }) => {
     const generateText = generating("Hello.");
-    const integration = createAiIntegration({ generateImage: unavailableAiGenerateImage(), generateText });
+    const integration = createAiIntegration({
+      generateImage: unavailableAiGenerateImage(),
+      generateText,
+      generateVideo: unavailableAiGenerateVideo(),
+    });
 
     await integration.generateText(forcedOn(model, toolChoice) as never);
 
@@ -340,6 +369,7 @@ describe("a conversation", () => {
     const integration = createAiIntegration({
       generateImage: unavailableAiGenerateImage(),
       generateText,
+      generateVideo: unavailableAiGenerateVideo(),
     });
     const input = {
       system: "You administer Jira.",
@@ -367,6 +397,7 @@ describe("a conversation", () => {
     const integration = createAiIntegration({
       generateImage: unavailableAiGenerateImage(),
       generateText: conversing({ text: "ABC-1 is open." }),
+      generateVideo: unavailableAiGenerateVideo(),
     });
 
     const turn = await integration.generateText({
@@ -393,6 +424,7 @@ describe("a conversation", () => {
   it("reports a failure when the model calls a tool it was not given", async () => {
     const integration = createAiIntegration({
       generateImage: unavailableAiGenerateImage(),
+      generateVideo: unavailableAiGenerateVideo(),
       generateText: conversing({
         text: "",
         toolCalls: [{ id: "call-1", name: "deleteIssue", arguments: {} }],
@@ -411,6 +443,7 @@ describe("a conversation", () => {
     const integration = createAiIntegration({
       generateImage: unavailableAiGenerateImage(),
       generateText: conversing({ text: " ", toolCalls: [] }),
+      generateVideo: unavailableAiGenerateVideo(),
     });
 
     await expect(
@@ -489,6 +522,7 @@ describe("a conversation", () => {
     const integration = createAiIntegration({
       generateImage: unavailableAiGenerateImage(),
       generateText,
+      generateVideo: unavailableAiGenerateVideo(),
     });
 
     await expect(integration.generateText(input as never)).rejects.toMatchObject({
@@ -503,6 +537,7 @@ describe("a conversation", () => {
     const integration = createAiIntegration({
       generateImage: unavailableAiGenerateImage(),
       generateText,
+      generateVideo: unavailableAiGenerateVideo(),
     });
 
     await integration.generateText({
@@ -520,6 +555,7 @@ describe("the default port", () => {
     const integration = createAiIntegration({
       generateImage: unavailableAiGenerateImage(),
       generateText: generating("unused"),
+      generateVideo: unavailableAiGenerateVideo(),
     });
 
     await expect(
@@ -534,6 +570,7 @@ describe("the default port", () => {
     const integration = createAiIntegration({
       generateImage: unavailableAiGenerateImage(),
       generateText: unavailableAiGenerateText(),
+      generateVideo: unavailableAiGenerateVideo(),
     });
 
     await expect(
@@ -558,6 +595,7 @@ describe("the default port", () => {
     const integrations = createWorkflowIntegrationsFromEnv({
       fetch: async () => new Response("{}"),
       generateText: generating("fixture text"),
+      generateVideo: unavailableAiGenerateVideo(),
     });
 
     await expect(
@@ -577,6 +615,123 @@ describe("the default port", () => {
       integrations.ai.generateImage({ prompt: "Illustrate this." }),
     ).resolves.toEqual({
       imageUrl: "https://images.example.test/generated.png",
+    });
+  });
+});
+
+describe("a media model", () => {
+  it.each(AI_IMAGE_MODELS)("hands the image model %s to the image port", async (model) => {
+    const generateImage = generatingImage("https://images.example.test/generated.png");
+    const integration = createAiIntegration({
+      generateImage,
+      generateText: generating("unused"),
+      generateVideo: unavailableAiGenerateVideo(),
+    });
+
+    await integration.generateImage({ prompt: "Draw it.", model });
+
+    expect(generateImage).toHaveBeenCalledWith({ prompt: "Draw it.", model }, {});
+  });
+
+  it.each(AI_VIDEO_MODELS)("hands the video model %s to the video port", async (model) => {
+    const generateVideo = generatingVideo("https://videos.example.test/generated.mp4");
+    const integration = createAiIntegration({
+      generateImage: unavailableAiGenerateImage(),
+      generateText: generating("unused"),
+      generateVideo,
+    });
+
+    await integration.generateVideo({ prompt: "Film it.", model });
+
+    expect(generateVideo).toHaveBeenCalledWith({ prompt: "Film it.", model }, {});
+  });
+
+  it("refuses an image model the host does not offer before calling the port", async () => {
+    const generateImage = generatingImage("https://images.example.test/generated.png");
+    const integration = createAiIntegration({
+      generateImage,
+      generateText: generating("unused"),
+      generateVideo: unavailableAiGenerateVideo(),
+    });
+
+    await expect(
+      integration.generateImage({ prompt: "Draw it.", model: AI_VIDEO_MODELS[0] } as never),
+    ).rejects.toMatchObject({ code: "INVALID_AI_REQUEST", retryable: false });
+    expect(generateImage).not.toHaveBeenCalled();
+  });
+
+  it("refuses a video model the host does not offer before calling the port", async () => {
+    const generateVideo = generatingVideo("https://videos.example.test/generated.mp4");
+    const integration = createAiIntegration({
+      generateImage: unavailableAiGenerateImage(),
+      generateText: generating("unused"),
+      generateVideo,
+    });
+
+    await expect(
+      integration.generateVideo({ prompt: "Film it.", model: AI_IMAGE_MODELS[0] } as never),
+    ).rejects.toThrow(/model must be one of "google\/veo-3\.1-fast", "kling\/kling-3\.0-pro"/);
+    expect(generateVideo).not.toHaveBeenCalled();
+  });
+});
+
+describe("generateVideo", () => {
+  it("returns only the port's video URL, without usage", async () => {
+    const integration = createAiIntegration({
+      generateImage: unavailableAiGenerateImage(),
+      generateText: generating("unused"),
+      generateVideo: vi.fn<AiGenerateVideoPort>(async () => ({
+        videoUrl: "https://videos.example.test/generated.mp4",
+        usage: { model: "model-1", microcents: 1 },
+      })),
+    });
+
+    await expect(integration.generateVideo({ prompt: "Film it." })).resolves.toEqual({
+      videoUrl: "https://videos.example.test/generated.mp4",
+    });
+  });
+
+  it.each([{ prompt: "" }, { prompt: "   " }, {}, { prompt: "x".repeat(AI_PROMPT_LIMIT_CHARACTERS + 1) }])(
+    "refuses the prompt of %j before calling the port",
+    async (input) => {
+      const generateVideo = generatingVideo("https://videos.example.test/generated.mp4");
+      const integration = createAiIntegration({
+        generateImage: unavailableAiGenerateImage(),
+        generateText: generating("unused"),
+        generateVideo,
+      });
+
+      await expect(integration.generateVideo(input as never)).rejects.toMatchObject({
+        code: "INVALID_AI_REQUEST",
+      });
+      expect(generateVideo).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([{}, { videoUrl: "" }, { videoUrl: "   " }, { videoUrl: 42 }])(
+    "reports a retryable failure rather than an empty video generation for %j",
+    async (value) => {
+      const integration = createAiIntegration({
+        generateImage: unavailableAiGenerateImage(),
+        generateText: generating("unused"),
+        generateVideo: (async () => value) as unknown as AiGenerateVideoPort,
+      });
+
+      await expect(integration.generateVideo({ prompt: "Film it." })).rejects.toMatchObject({
+        code: "AI_GENERATION_EMPTY",
+        retryable: true,
+      });
+    },
+  );
+
+  it("accepts an injected video generation port on a fixture surface", async () => {
+    const integrations = createWorkflowIntegrationsFromEnv({
+      fetch: async () => new Response("{}"),
+      generateVideo: generatingVideo("https://videos.example.test/generated.mp4"),
+    });
+
+    await expect(integrations.ai.generateVideo({ prompt: "Film it." })).resolves.toEqual({
+      videoUrl: "https://videos.example.test/generated.mp4",
     });
   });
 });

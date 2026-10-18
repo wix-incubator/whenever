@@ -1,7 +1,11 @@
 import {
+  AI_IMAGE_MODELS,
+  AI_VIDEO_MODELS,
   type AiConversationResult,
+  type AiImageModel,
   type AiIntegration,
   type AiToolCall,
+  type AiVideoModel,
   NonRetryableError,
   RetryableError,
 } from "@wix/whenever-workflow-sdk";
@@ -31,6 +35,12 @@ export {
 
 export interface AiGenerateImageRequest {
   readonly prompt: string;
+  readonly model?: AiImageModel;
+}
+
+export interface AiGenerateVideoRequest {
+  readonly prompt: string;
+  readonly model?: AiVideoModel;
 }
 
 export interface AiGenerationCall {
@@ -65,9 +75,15 @@ export type AiGenerateImagePort = (
   call: AiGenerationCall,
 ) => Promise<{ readonly imageUrl: string; readonly usage?: AiUsage }>;
 
+export type AiGenerateVideoPort = (
+  request: AiGenerateVideoRequest,
+  call: AiGenerationCall,
+) => Promise<{ readonly videoUrl: string; readonly usage?: AiUsage }>;
+
 export interface AiIntegrationOptions {
   generateImage: AiGenerateImagePort;
   generateText: AiGenerateTextPort;
+  generateVideo: AiGenerateVideoPort;
   timeoutMs?: number;
   signal?: AbortSignal;
 }
@@ -76,23 +92,44 @@ export function prepareAiGenerateTextInput(input: unknown): AiGenerateTextReques
   return prepareAiTextRequest(input);
 }
 
-export function prepareAiGenerateImageInput(
+function prepareAiMediaRequest<TModel extends string>(
+  kind: "image" | "video",
+  models: readonly TModel[],
   input: unknown,
-): AiGenerateImageRequest {
+): { readonly prompt: string; readonly model?: TModel } {
   if (!isPlainRecord(input)) {
-    throw invalidAiRequest("image", "input must be an object");
+    throw invalidAiRequest(kind, "input must be an object");
   }
-  const { prompt } = input;
+  const { prompt, model } = input;
   if (typeof prompt !== "string" || !prompt.trim()) {
-    throw invalidAiRequest("image", "prompt must be a non-empty string");
+    throw invalidAiRequest(kind, "prompt must be a non-empty string");
   }
   if (prompt.length > AI_PROMPT_LIMIT_CHARACTERS) {
     throw invalidAiRequest(
-      "image",
+      kind,
       `prompt exceeds ${String(AI_PROMPT_LIMIT_CHARACTERS)} characters`,
     );
   }
-  return { prompt };
+  if (model === undefined) return { prompt };
+  if (!models.includes(model as TModel)) {
+    throw invalidAiRequest(
+      kind,
+      `model must be one of ${models.map((value) => JSON.stringify(value)).join(", ")}`,
+    );
+  }
+  return { prompt, model: model as TModel };
+}
+
+export function prepareAiGenerateImageInput(
+  input: unknown,
+): AiGenerateImageRequest {
+  return prepareAiMediaRequest("image", AI_IMAGE_MODELS, input);
+}
+
+export function prepareAiGenerateVideoInput(
+  input: unknown,
+): AiGenerateVideoRequest {
+  return prepareAiMediaRequest("video", AI_VIDEO_MODELS, input);
 }
 
 function emptyTextGeneration(): RetryableError {
@@ -167,6 +204,7 @@ function conversationTurn(
 export function createAiIntegration({
   generateImage,
   generateText,
+  generateVideo,
   timeoutMs,
   signal,
 }: AiIntegrationOptions): AiIntegration {
@@ -190,6 +228,21 @@ export function createAiIntegration({
       }
       return { imageUrl: generated.imageUrl };
     },
+    async generateVideo(input) {
+      const request = prepareAiGenerateVideoInput(input);
+      const generated = await generateVideo(request, call);
+      if (
+        !isPlainRecord(generated) ||
+        typeof generated.videoUrl !== "string" ||
+        !generated.videoUrl.trim()
+      ) {
+        throw new RetryableError("The model returned no generated video", {
+          code: "AI_GENERATION_EMPTY",
+          operation: "ai.generateVideo",
+        });
+      }
+      return { videoUrl: generated.videoUrl };
+    },
     generateText: (async (input: unknown) => {
       const request = prepareAiGenerateTextInput(input);
       const generated = await generateText(request, call);
@@ -207,6 +260,15 @@ export function unavailableAiGenerateImage(): AiGenerateImagePort {
     throw new NonRetryableError(
       "AI image generation requires a host-supplied generation port",
       { code: "AI_GENERATION_UNAVAILABLE", operation: "ai.generateImage" },
+    );
+  };
+}
+
+export function unavailableAiGenerateVideo(): AiGenerateVideoPort {
+  return () => {
+    throw new NonRetryableError(
+      "AI video generation requires a host-supplied generation port",
+      { code: "AI_GENERATION_UNAVAILABLE", operation: "ai.generateVideo" },
     );
   };
 }

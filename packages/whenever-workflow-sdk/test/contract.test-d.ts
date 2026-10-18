@@ -8,6 +8,8 @@ import type {
   AiGenerateImageResult,
   AiGenerateTextInput,
   AiGenerateTextResult,
+  AiGenerateVideoInput,
+  AiGenerateVideoResult,
   AiMessage,
   CreateWorkflowContextOptions,
   HttpResponseResult,
@@ -254,6 +256,12 @@ test("workflow context exposes a typed AI image generation integration", () => {
   expectTypeOf(ctx.integrations.ai.generateImage)
     .parameter(0)
     .toEqualTypeOf<AiGenerateImageInput>();
+  expectTypeOf(
+    ctx.integrations.ai.generateVideo({ prompt: "Film this workflow.", model: "google/veo-3.1-fast" }),
+  ).toEqualTypeOf<Promise<AiGenerateVideoResult>>();
+  expectTypeOf(ctx.integrations.ai.generateVideo)
+    .parameter(0)
+    .toEqualTypeOf<AiGenerateVideoInput>();
 });
 
 test("workflow context exposes a typed database query integration", () => {
