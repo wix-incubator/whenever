@@ -285,16 +285,8 @@ describe("wixAutomationsWebhook", () => {
 });
 
 describe("slackAppEventsWebhook", () => {
-  it("narrows the endpoint to the trimmed Slack event it names", () => {
-    expect(slackAppEventsWebhook({ key: "mentions", event: "  app_mention  " }).event).toBe("app_mention");
-  });
-
-  it("omits the event when none is selected", () => {
+  it("has no event selector: every subscribed Slack event reaches the run", () => {
     expect("event" in slackAppEventsWebhook({ key: "events" })).toBe(false);
-  });
-
-  it("refuses a blank event", () => {
-    expect(() => slackAppEventsWebhook({ key: "events", event: "   " })).toThrow(/non-empty event name/);
   });
 });
 
