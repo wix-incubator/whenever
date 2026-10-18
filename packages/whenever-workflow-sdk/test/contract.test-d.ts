@@ -418,6 +418,7 @@ test("WebhookProvider enumerates the supported providers", () => {
     | "standard-webhooks"
     | "supabase"
     | "telegram"
+    | "vercel"
     | "wix-app"
     | "wix-automations"
   >();

@@ -134,6 +134,18 @@ export function supabaseDatabaseWebhook(options: WebhookIdentity): WebhookTrigge
 }
 
 /**
+ * Events from a Vercel team's account webhook: deployments, projects, domains, feature flags and
+ * firewall alerts. The host must verify the `x-vercel-signature` HMAC-SHA1 with the secret Vercel
+ * shows when the webhook is created. `ctx.input` is `{ id, type, createdAt, region, payload }` and
+ * `ctx.trigger.eventType` is its `type`, such as `"deployment.created"`.
+ *
+ * @see https://vercel.com/docs/webhooks
+ */
+export function vercelWebhook(options: WebhookIdentity): WebhookTrigger {
+  return signedWebhook("vercel", options);
+}
+
+/**
  * A Wix app's webhooks: app events such as `AppInstalled` and site events such as
  * `wix.ecom.v1.order_created`. The host must verify Wix's JWT with the app's configured public key
  * and decode it: `ctx.input` is `{ eventType, instanceId, data,

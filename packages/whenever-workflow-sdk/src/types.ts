@@ -138,6 +138,7 @@ export type WebhookProvider =
   | "standard-webhooks"
   | "supabase"
   | "telegram"
+  | "vercel"
   | "wix-app"
   | "wix-automations";
 

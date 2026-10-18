@@ -262,7 +262,7 @@ export interface WebhookOptions {
  * deliveries, declare its helper from `@wix/whenever-workflow-sdk/webhooks`
  * instead (`metaAppWhatsAppWebhook`, `slackAppEventsWebhook`, `stripeWebhook`,
  * `githubWebhook`, `shopifyWebhook`, `standardWebhook`, `telegramBotWebhook`,
- * `supabaseDatabaseWebhook`, `wixAppWebhook`); the host must verify those with the sender's credentials. For a Wix Automations automation declare `wixAutomationsWebhook`: as
+ * `supabaseDatabaseWebhook`, `vercelWebhook`, `wixAppWebhook`); the host must verify those with the sender's credentials. For a Wix Automations automation declare `wixAutomationsWebhook`: as
  * unverified as this one, but it names the sender whose body the run receives.
  *
  * Throws when `key` is empty, or when given a signing option such as `provider`
