@@ -31,7 +31,6 @@ export interface CreateWorkflowIntegrationsFromEnvOptions {
   generateText?: AiGenerateTextPort;
   generateVideo?: AiGenerateVideoPort;
   queryPostgres?: PostgresQueryPort;
-  /** The connections an `http` request may name, keyed by name. */
   httpConnections?: Readonly<Record<string, HttpConnection>>;
 }
 

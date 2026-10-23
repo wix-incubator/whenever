@@ -313,7 +313,6 @@ export interface GuardedFetchOptions {
   /** Shared across every request this fetch makes: the per-request timeout restarts
    * on each call, so a two-hop operation would otherwise get the window twice. */
   signal?: AbortSignal;
-  /** Off for a request carrying a credential no redirect target was approved to receive. */
   followRedirects?: boolean;
 }
 

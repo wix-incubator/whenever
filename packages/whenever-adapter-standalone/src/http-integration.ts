@@ -21,12 +21,7 @@ import {
 import { strictJsonSnapshot, strictJsonViolation } from "./strict-json";
 
 export interface HttpConnection {
-  /** A request through the connection must address this URL or a path below it. */
   readonly baseUrl: string;
-  /**
-   * The credential headers sent with every request through the connection, read as each request is
-   * sent, so a getter can supply a credential only when it is used.
-   */
   readonly headers: Readonly<Record<string, string>>;
 }
 
@@ -35,7 +30,6 @@ export interface HttpIntegrationOptions {
   resolveHost?: ResolveHost;
   timeoutMs?: number;
   signal?: AbortSignal;
-  /** The connections a request may name in `connection`, keyed by that name. */
   connections?: Readonly<Record<string, HttpConnection>>;
 }
 
@@ -271,12 +265,9 @@ function connect(
   return true;
 }
 
-/** Whether a request to `url` stays at the address a connection with this base URL may send to. */
 export function sendsWithinConnection(baseUrl: string, url: URL): boolean {
   const base = new URL(baseUrl);
   if (url.origin !== base.origin) return false;
-  // An encoded separator is opaque to URL parsing but not to every server, so the path is judged
-  // again as one that decodes it: `..%2f` must not climb out, while `group%2Fproject` stays valid.
   if (!underBase(url.pathname, base.pathname)) return false;
   const decoded = new URL(`${base.origin}${url.pathname.replaceAll(/%2f|%5c/giu, "/")}`);
   return underBase(decoded.pathname, base.pathname);
