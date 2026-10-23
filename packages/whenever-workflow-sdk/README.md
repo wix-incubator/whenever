@@ -46,6 +46,8 @@ Additional provider bindings extend `WorkflowIntegrations` through TypeScript mo
 Types alone do not establish that a host implements an operation.
 
 Workflow code calls integration ports rather than reading environment variables or credentials.
+An `http` request can name a `connection` the host holds; the host then adds that connection's
+credentials and refuses a URL outside its address.
 The host configures credentials, authorization, deadlines and retry policy. `RetryableError` and
 `NonRetryableError` let adapters report whether an operation may be retried.
 

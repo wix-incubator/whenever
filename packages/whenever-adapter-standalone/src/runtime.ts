@@ -11,7 +11,10 @@ import {
 } from "./ai-integration";
 import { type ResolveHost } from "./egress";
 import type { FetchLike } from "./http";
-import { createHttpIntegrationFromEnv } from "./http-integration";
+import {
+  createHttpIntegrationFromEnv,
+  type HttpConnection,
+} from "./http-integration";
 import { createMcpIntegrationFromEnv } from "./mcp-integration";
 import {
   createPostgresIntegration,
@@ -28,6 +31,8 @@ export interface CreateWorkflowIntegrationsFromEnvOptions {
   generateText?: AiGenerateTextPort;
   generateVideo?: AiGenerateVideoPort;
   queryPostgres?: PostgresQueryPort;
+  /** The connections an `http` request may name, keyed by name. */
+  httpConnections?: Readonly<Record<string, HttpConnection>>;
 }
 
 export function createWorkflowIntegrationsFromEnv(
@@ -47,6 +52,9 @@ export function createWorkflowIntegrationsFromEnv(
     http: createHttpIntegrationFromEnv({
       fetch: fetchImplementation,
       ...egressOptions,
+      ...(options.httpConnections === undefined
+        ? {}
+        : { connections: options.httpConnections }),
     }),
     mcp: createMcpIntegrationFromEnv({
       fetch: fetchImplementation,

@@ -129,7 +129,7 @@ ${declarations}
 
 ## Side effects (\`ctx.integrations\`)
 
-\`ctx.integrations\` is a \`WorkflowIntegrations\` port. The SDK itself declares ${providerKeys.join(", ")}. \`http\` and \`mcp\` take an address the author supplies; \`postgres\` and \`ai\` use host-supplied ports.
+\`ctx.integrations\` is a \`WorkflowIntegrations\` port. The SDK itself declares ${providerKeys.join(", ")}. \`http\` and \`mcp\` take an address the author supplies; an \`http\` request that names a \`connection\` gets that connection's credentials from the host and must stay at its address. \`postgres\` and \`ai\` use host-supplied ports.
 
 \`ai.generateText\` takes an optional \`model\`, one of ${AI_TEXT_MODELS.map((model) => `\`"${model}"\``).join(", ")} (\`AI_TEXT_MODELS\`), and an optional \`reasoningEffort\` of \`"low"\`, \`"medium"\` or \`"high"\`. Omit either for the host's default. ${AI_TEXT_MODELS_WITHOUT_FORCED_TOOL_CHOICE.map((model) => `\`"${model}"\``).join(" and ")} cannot be forced to call a tool (\`AI_TEXT_MODELS_WITHOUT_FORCED_TOOL_CHOICE\`): with them, a \`toolChoice\` other than \`"auto"\` is refused.
 

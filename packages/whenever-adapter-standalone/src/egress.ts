@@ -313,6 +313,8 @@ export interface GuardedFetchOptions {
   /** Shared across every request this fetch makes: the per-request timeout restarts
    * on each call, so a two-hop operation would otherwise get the window twice. */
   signal?: AbortSignal;
+  /** Off for a request carrying a credential no redirect target was approved to receive. */
+  followRedirects?: boolean;
 }
 
 function invocationDeadline(
@@ -399,7 +401,9 @@ export function createGuardedFetch(
       }
 
       const location = response.headers.get("location");
-      if (location === null || location === "") return response;
+      if (location === null || location === "" || options.followRedirects === false) {
+        return response;
+      }
       await cancelRedirectBody(response, deadline);
 
       let target: URL;

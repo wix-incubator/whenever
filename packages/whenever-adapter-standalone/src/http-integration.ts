@@ -19,11 +19,20 @@ import {
 } from "./http";
 import { strictJsonSnapshot, strictJsonViolation } from "./strict-json";
 
+export interface HttpConnection {
+  /** A request through the connection must address this URL or a path below it. */
+  readonly baseUrl: string;
+  /** The credential headers sent with every request through the connection. */
+  readonly headers: Readonly<Record<string, string>>;
+}
+
 export interface HttpIntegrationOptions {
   fetch: FetchLike;
   resolveHost?: ResolveHost;
   timeoutMs?: number;
   signal?: AbortSignal;
+  /** The connections a request may name in `connection`, keyed by that name. */
+  connections?: Readonly<Record<string, HttpConnection>>;
 }
 
 function targetUrl(input: unknown): URL {
@@ -49,8 +58,8 @@ function targetUrl(input: unknown): URL {
 function writeInit(
   method: "POST" | "PUT" | "PATCH",
   input: HttpWriteInput,
+  headers: Headers,
 ): RequestInit {
-  const headers = requestHeaders(input.headers);
   const init: RequestInit = { method, headers };
   if (input.body !== undefined) {
     if (!headers.has("content-type")) {
@@ -146,10 +155,11 @@ export function prepareHttpGetInput(input: unknown): {
 export function prepareHttpWriteInput(
   method: "POST" | "PUT" | "PATCH",
   input: unknown,
-): { input: HttpWriteInput; url: URL; init: RequestInit } {
+): { input: HttpWriteInput; url: URL; headers: Headers; init: RequestInit } {
   const url = targetUrl(input);
   const validated = input as HttpWriteInput;
-  return { input: validated, url, init: writeInit(method, validated) };
+  const headers = requestHeaders(validated.headers);
+  return { input: validated, url, headers, init: writeInit(method, validated, headers) };
 }
 
 function requestHeaders(value: HttpRequestInput["headers"]): Headers {
@@ -168,6 +178,12 @@ export function validateHttpRequestInput(
   }
   if (typeof input.url !== "string" || input.url.trim() === "") {
     throw invalidHttpRequest("url must be a non-empty string");
+  }
+  if (
+    input.connection !== undefined &&
+    (typeof input.connection !== "string" || input.connection.trim() === "")
+  ) {
+    throw invalidHttpRequest("connection must be a non-empty string");
   }
   validateStringRecord(input.headers, "headers");
   validateStringRecord(input.query, "query");
@@ -217,6 +233,52 @@ function encodeJsonBody(value: unknown): string {
   return withinRequestLimit(encoded);
 }
 
+function connect(
+  connections: HttpIntegrationOptions["connections"],
+  input: HttpRequestInput,
+  url: URL,
+  headers: Headers,
+): void {
+  const name = input.connection;
+  if (name === undefined) return;
+  const connection =
+    connections !== undefined && Object.prototype.hasOwnProperty.call(connections, name)
+      ? connections[name]
+      : undefined;
+  if (connection === undefined) {
+    throw invalidHttpRequest(`connection "${name}" is not available here`);
+  }
+  if (!sendsWithinConnection(connection.baseUrl, url)) {
+    throw invalidHttpRequest(
+      `connection "${name}" sends only to ${connection.baseUrl}`,
+    );
+  }
+  for (const [header, value] of Object.entries(connection.headers)) {
+    if (headers.has(header)) {
+      throw invalidHttpRequest(
+        `connection "${name}" sets the ${header.toLowerCase()} header itself`,
+      );
+    }
+    headers.set(header, value);
+  }
+}
+
+/** Whether a request to `url` stays at the address a connection with this base URL may send to. */
+export function sendsWithinConnection(baseUrl: string, url: URL): boolean {
+  const base = new URL(baseUrl);
+  if (url.origin !== base.origin) return false;
+  // An encoded separator is opaque to URL parsing but not to every server, so the path is judged
+  // again as one that decodes it: `..%2f` must not climb out, while `group%2Fproject` stays valid.
+  if (!underBase(url.pathname, base.pathname)) return false;
+  const decoded = new URL(`${base.origin}${url.pathname.replaceAll(/%2f|%5c/giu, "/")}`);
+  return underBase(decoded.pathname, base.pathname);
+}
+
+function underBase(pathname: string, basePath: string): boolean {
+  const prefix = basePath.endsWith("/") ? basePath : `${basePath}/`;
+  return pathname === basePath || pathname.startsWith(prefix);
+}
+
 function invalidHttpRequest(message: string): NonRetryableError {
   return new NonRetryableError(`Invalid HTTP request: ${message}.`, {
     code: "INVALID_HTTP_REQUEST",
@@ -228,16 +290,31 @@ export function createHttpIntegrationFromEnv({
   resolveHost,
   timeoutMs,
   signal,
+  connections,
 }: HttpIntegrationOptions): HttpIntegration {
-  const fetch = createGuardedFetch(rawFetch, {
+  const guard = {
     ...(resolveHost !== undefined ? { resolveHost } : {}),
     ...(timeoutMs !== undefined ? { timeoutMs } : {}),
     ...(signal !== undefined ? { signal } : {}),
-  });
+  };
+  const unconnectedFetch = createGuardedFetch(rawFetch, guard);
+  const connectedFetch = createGuardedFetch(rawFetch, { ...guard, followRedirects: false });
+  const fetchFor = (input: HttpRequestInput): FetchLike =>
+    input.connection === undefined ? unconnectedFetch : connectedFetch;
+  const prepareConnectedWrite = (
+    method: "POST" | "PUT" | "PATCH",
+    input: unknown,
+  ): { url: URL; init: RequestInit; fetch: FetchLike } => {
+    const prepared = prepareHttpWriteInput(method, input);
+    connect(connections, prepared.input, prepared.url, prepared.headers);
+    return { ...prepared, fetch: fetchFor(prepared.input) };
+  };
   return {
     async get(input) {
-      const { headers, url } = prepareHttpGetInput(input);
-      return requestEnvelope(fetch, url, {
+      const prepared = prepareHttpGetInput(input);
+      const { headers, url } = prepared;
+      connect(connections, prepared.input, url, headers);
+      return requestEnvelope(fetchFor(prepared.input), url, {
         code: "HTTP_REQUEST_FAILED",
         failureMode: "safe",
         maxResponseBytes: HTTP_RESPONSE_BODY_LIMIT_BYTES,
@@ -245,7 +322,7 @@ export function createHttpIntegrationFromEnv({
       });
     },
     async post(input) {
-      const { init, url } = prepareHttpWriteInput("POST", input);
+      const { init, url, fetch } = prepareConnectedWrite("POST", input);
       return requestEnvelope(fetch, url, {
         code: "HTTP_REQUEST_FAILED",
         failureMode: "write",
@@ -254,7 +331,7 @@ export function createHttpIntegrationFromEnv({
       });
     },
     async put(input) {
-      const { init, url } = prepareHttpWriteInput("PUT", input);
+      const { init, url, fetch } = prepareConnectedWrite("PUT", input);
       return requestEnvelope(fetch, url, {
         code: "HTTP_REQUEST_FAILED",
         failureMode: "write",
@@ -263,7 +340,7 @@ export function createHttpIntegrationFromEnv({
       });
     },
     async patch(input) {
-      const { init, url } = prepareHttpWriteInput("PATCH", input);
+      const { init, url, fetch } = prepareConnectedWrite("PATCH", input);
       return requestEnvelope(fetch, url, {
         code: "HTTP_REQUEST_FAILED",
         failureMode: "write",
