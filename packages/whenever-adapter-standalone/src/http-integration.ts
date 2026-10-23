@@ -15,15 +15,22 @@ import {
   type FetchLike,
   HTTP_REQUEST_BODY_LIMIT_BYTES,
   HTTP_RESPONSE_BODY_LIMIT_BYTES,
+  type HttpEnvelope,
   requestEnvelope,
 } from "./http";
 import { strictJsonSnapshot, strictJsonViolation } from "./strict-json";
+
+export interface HttpConnection {
+  readonly baseUrl: string;
+  readonly headers: Readonly<Record<string, string>>;
+}
 
 export interface HttpIntegrationOptions {
   fetch: FetchLike;
   resolveHost?: ResolveHost;
   timeoutMs?: number;
   signal?: AbortSignal;
+  connections?: Readonly<Record<string, HttpConnection>>;
 }
 
 function targetUrl(input: unknown): URL {
@@ -49,8 +56,8 @@ function targetUrl(input: unknown): URL {
 function writeInit(
   method: "POST" | "PUT" | "PATCH",
   input: HttpWriteInput,
+  headers: Headers,
 ): RequestInit {
-  const headers = requestHeaders(input.headers);
   const init: RequestInit = { method, headers };
   if (input.body !== undefined) {
     if (!headers.has("content-type")) {
@@ -149,7 +156,11 @@ export function prepareHttpWriteInput(
 ): { input: HttpWriteInput; url: URL; init: RequestInit } {
   const url = targetUrl(input);
   const validated = input as HttpWriteInput;
-  return { input: validated, url, init: writeInit(method, validated) };
+  return {
+    input: validated,
+    url,
+    init: writeInit(method, validated, requestHeaders(validated.headers)),
+  };
 }
 
 function requestHeaders(value: HttpRequestInput["headers"]): Headers {
@@ -168,6 +179,12 @@ export function validateHttpRequestInput(
   }
   if (typeof input.url !== "string" || input.url.trim() === "") {
     throw invalidHttpRequest("url must be a non-empty string");
+  }
+  if (
+    input.connection !== undefined &&
+    (typeof input.connection !== "string" || input.connection.trim() === "")
+  ) {
+    throw invalidHttpRequest("connection must be a non-empty string");
   }
   validateStringRecord(input.headers, "headers");
   validateStringRecord(input.query, "query");
@@ -217,6 +234,50 @@ function encodeJsonBody(value: unknown): string {
   return withinRequestLimit(encoded);
 }
 
+function connect(
+  connections: HttpIntegrationOptions["connections"],
+  input: HttpRequestInput,
+  url: URL,
+  headers: Headers,
+): boolean {
+  const name = input.connection;
+  if (name === undefined) return false;
+  const connection =
+    connections !== undefined && Object.prototype.hasOwnProperty.call(connections, name)
+      ? connections[name]
+      : undefined;
+  if (connection === undefined) {
+    throw invalidHttpRequest(`connection "${name}" is not available here`);
+  }
+  if (!sendsWithinConnection(connection.baseUrl, url)) {
+    throw invalidHttpRequest(
+      `connection "${name}" sends only to ${connection.baseUrl}`,
+    );
+  }
+  for (const [header, value] of Object.entries(connection.headers)) {
+    if (headers.has(header)) {
+      throw invalidHttpRequest(
+        `connection "${name}" sets the ${header.toLowerCase()} header itself`,
+      );
+    }
+    headers.set(header, value);
+  }
+  return true;
+}
+
+export function sendsWithinConnection(baseUrl: string, url: URL): boolean {
+  const base = new URL(baseUrl);
+  if (url.origin !== base.origin) return false;
+  if (!underBase(url.pathname, base.pathname)) return false;
+  const decoded = new URL(`${base.origin}${url.pathname.replaceAll(/%2f|%5c/giu, "/")}`);
+  return underBase(decoded.pathname, base.pathname);
+}
+
+function underBase(pathname: string, basePath: string): boolean {
+  const prefix = basePath.endsWith("/") ? basePath : `${basePath}/`;
+  return pathname === basePath || pathname.startsWith(prefix);
+}
+
 function invalidHttpRequest(message: string): NonRetryableError {
   return new NonRetryableError(`Invalid HTTP request: ${message}.`, {
     code: "INVALID_HTTP_REQUEST",
@@ -228,48 +289,34 @@ export function createHttpIntegrationFromEnv({
   resolveHost,
   timeoutMs,
   signal,
+  connections,
 }: HttpIntegrationOptions): HttpIntegration {
-  const fetch = createGuardedFetch(rawFetch, {
+  const guard = {
     ...(resolveHost !== undefined ? { resolveHost } : {}),
     ...(timeoutMs !== undefined ? { timeoutMs } : {}),
     ...(signal !== undefined ? { signal } : {}),
-  });
+  };
+  const unconnectedFetch = createGuardedFetch(rawFetch, guard);
+  const connectedFetch = createGuardedFetch(rawFetch, { ...guard, followRedirects: false });
+  const send = async (
+    method: "GET" | "POST" | "PUT" | "PATCH",
+    input: unknown,
+  ): Promise<HttpEnvelope> => {
+    const url = targetUrl(input);
+    const request = input as HttpWriteInput;
+    const headers = requestHeaders(request.headers);
+    const connected = connect(connections, request, url, headers);
+    return requestEnvelope(connected ? connectedFetch : unconnectedFetch, url, {
+      code: "HTTP_REQUEST_FAILED",
+      failureMode: method === "GET" ? "safe" : "write",
+      maxResponseBytes: HTTP_RESPONSE_BODY_LIMIT_BYTES,
+      init: method === "GET" ? { method, headers } : writeInit(method, request, headers),
+    });
+  };
   return {
-    async get(input) {
-      const { headers, url } = prepareHttpGetInput(input);
-      return requestEnvelope(fetch, url, {
-        code: "HTTP_REQUEST_FAILED",
-        failureMode: "safe",
-        maxResponseBytes: HTTP_RESPONSE_BODY_LIMIT_BYTES,
-        init: { method: "GET", headers },
-      });
-    },
-    async post(input) {
-      const { init, url } = prepareHttpWriteInput("POST", input);
-      return requestEnvelope(fetch, url, {
-        code: "HTTP_REQUEST_FAILED",
-        failureMode: "write",
-        maxResponseBytes: HTTP_RESPONSE_BODY_LIMIT_BYTES,
-        init,
-      });
-    },
-    async put(input) {
-      const { init, url } = prepareHttpWriteInput("PUT", input);
-      return requestEnvelope(fetch, url, {
-        code: "HTTP_REQUEST_FAILED",
-        failureMode: "write",
-        maxResponseBytes: HTTP_RESPONSE_BODY_LIMIT_BYTES,
-        init,
-      });
-    },
-    async patch(input) {
-      const { init, url } = prepareHttpWriteInput("PATCH", input);
-      return requestEnvelope(fetch, url, {
-        code: "HTTP_REQUEST_FAILED",
-        failureMode: "write",
-        maxResponseBytes: HTTP_RESPONSE_BODY_LIMIT_BYTES,
-        init,
-      });
-    },
+    get: async (input) => await send("GET", input),
+    post: async (input) => await send("POST", input),
+    put: async (input) => await send("PUT", input),
+    patch: async (input) => await send("PATCH", input),
   };
 }

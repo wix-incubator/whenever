@@ -44,7 +44,10 @@ export {
   readResponseText,
   redactReportedText,
 } from "./http";
-export type { HttpIntegrationOptions } from "./http-integration";
+export type {
+  HttpConnection,
+  HttpIntegrationOptions,
+} from "./http-integration";
 export { createHttpIntegrationFromEnv } from "./http-integration";
 export type {
   ListMcpTools,

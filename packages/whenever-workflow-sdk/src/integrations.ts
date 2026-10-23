@@ -218,6 +218,11 @@ export interface AiIntegration {
 
 export interface HttpRequestInput {
   url: string;
+  /**
+   * Names a connection the host holds. The host adds that connection's credentials and refuses a
+   * `url` outside its address, so the workflow passes no credential header of its own.
+   */
+  connection?: string;
   headers?: Record<string, string>;
   query?: Record<string, string>;
 }
