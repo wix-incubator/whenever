@@ -176,6 +176,47 @@ describe("HTTP requests through a connection", () => {
     expect(fetch).toHaveBeenCalledOnce();
   });
 
+  it("refuses the redirect when the connection name reads differently the second time", async () => {
+    const fetch = vi.fn<FetchLike>().mockResolvedValue(
+      new Response(null, { status: 302, headers: { Location: "/oauth/v2/authorize" } }),
+    );
+    let reads = 0;
+    const input = {
+      url: "https://slack.com/api/auth.test",
+      get connection() {
+        reads += 1;
+        return reads <= 4 ? "slack" : undefined;
+      },
+    };
+
+    await expect(integrations(fetch).http.get(input)).rejects.toMatchObject({
+      retryable: false,
+    });
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
+  it("sends a connection's own content-type with the body", async () => {
+    const fetch = vi.fn<FetchLike>().mockResolvedValue(okResponse());
+    const formConnection = createWorkflowIntegrationsFromEnv({
+      fetch,
+      resolveHost: async () => ["93.184.216.34"],
+      httpConnections: {
+        forms: {
+          baseUrl: "https://forms.example.com/submit",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        },
+      },
+    });
+
+    await formConnection.http.post({
+      connection: "forms",
+      url: "https://forms.example.com/submit",
+      body: { name: "Ada" },
+    });
+
+    expect(fetch.mock.calls[0]?.[1]?.body).toBe("name=Ada");
+  });
+
   it("still follows a redirect for a request that names no connection", async () => {
     const fetch = vi
       .fn<FetchLike>()

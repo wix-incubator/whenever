@@ -15,6 +15,7 @@ import {
   type FetchLike,
   HTTP_REQUEST_BODY_LIMIT_BYTES,
   HTTP_RESPONSE_BODY_LIMIT_BYTES,
+  type HttpEnvelope,
   requestEnvelope,
 } from "./http";
 import { strictJsonSnapshot, strictJsonViolation } from "./strict-json";
@@ -22,7 +23,10 @@ import { strictJsonSnapshot, strictJsonViolation } from "./strict-json";
 export interface HttpConnection {
   /** A request through the connection must address this URL or a path below it. */
   readonly baseUrl: string;
-  /** The credential headers sent with every request through the connection. */
+  /**
+   * The credential headers sent with every request through the connection, read as each request is
+   * sent, so a getter can supply a credential only when it is used.
+   */
   readonly headers: Readonly<Record<string, string>>;
 }
 
@@ -155,11 +159,14 @@ export function prepareHttpGetInput(input: unknown): {
 export function prepareHttpWriteInput(
   method: "POST" | "PUT" | "PATCH",
   input: unknown,
-): { input: HttpWriteInput; url: URL; headers: Headers; init: RequestInit } {
+): { input: HttpWriteInput; url: URL; init: RequestInit } {
   const url = targetUrl(input);
   const validated = input as HttpWriteInput;
-  const headers = requestHeaders(validated.headers);
-  return { input: validated, url, headers, init: writeInit(method, validated, headers) };
+  return {
+    input: validated,
+    url,
+    init: writeInit(method, validated, requestHeaders(validated.headers)),
+  };
 }
 
 function requestHeaders(value: HttpRequestInput["headers"]): Headers {
@@ -238,9 +245,9 @@ function connect(
   input: HttpRequestInput,
   url: URL,
   headers: Headers,
-): void {
+): boolean {
   const name = input.connection;
-  if (name === undefined) return;
+  if (name === undefined) return false;
   const connection =
     connections !== undefined && Object.prototype.hasOwnProperty.call(connections, name)
       ? connections[name]
@@ -261,6 +268,7 @@ function connect(
     }
     headers.set(header, value);
   }
+  return true;
 }
 
 /** Whether a request to `url` stays at the address a connection with this base URL may send to. */
@@ -299,54 +307,25 @@ export function createHttpIntegrationFromEnv({
   };
   const unconnectedFetch = createGuardedFetch(rawFetch, guard);
   const connectedFetch = createGuardedFetch(rawFetch, { ...guard, followRedirects: false });
-  const fetchFor = (input: HttpRequestInput): FetchLike =>
-    input.connection === undefined ? unconnectedFetch : connectedFetch;
-  const prepareConnectedWrite = (
-    method: "POST" | "PUT" | "PATCH",
+  const send = async (
+    method: "GET" | "POST" | "PUT" | "PATCH",
     input: unknown,
-  ): { url: URL; init: RequestInit; fetch: FetchLike } => {
-    const prepared = prepareHttpWriteInput(method, input);
-    connect(connections, prepared.input, prepared.url, prepared.headers);
-    return { ...prepared, fetch: fetchFor(prepared.input) };
+  ): Promise<HttpEnvelope> => {
+    const url = targetUrl(input);
+    const request = input as HttpWriteInput;
+    const headers = requestHeaders(request.headers);
+    const connected = connect(connections, request, url, headers);
+    return requestEnvelope(connected ? connectedFetch : unconnectedFetch, url, {
+      code: "HTTP_REQUEST_FAILED",
+      failureMode: method === "GET" ? "safe" : "write",
+      maxResponseBytes: HTTP_RESPONSE_BODY_LIMIT_BYTES,
+      init: method === "GET" ? { method, headers } : writeInit(method, request, headers),
+    });
   };
   return {
-    async get(input) {
-      const prepared = prepareHttpGetInput(input);
-      const { headers, url } = prepared;
-      connect(connections, prepared.input, url, headers);
-      return requestEnvelope(fetchFor(prepared.input), url, {
-        code: "HTTP_REQUEST_FAILED",
-        failureMode: "safe",
-        maxResponseBytes: HTTP_RESPONSE_BODY_LIMIT_BYTES,
-        init: { method: "GET", headers },
-      });
-    },
-    async post(input) {
-      const { init, url, fetch } = prepareConnectedWrite("POST", input);
-      return requestEnvelope(fetch, url, {
-        code: "HTTP_REQUEST_FAILED",
-        failureMode: "write",
-        maxResponseBytes: HTTP_RESPONSE_BODY_LIMIT_BYTES,
-        init,
-      });
-    },
-    async put(input) {
-      const { init, url, fetch } = prepareConnectedWrite("PUT", input);
-      return requestEnvelope(fetch, url, {
-        code: "HTTP_REQUEST_FAILED",
-        failureMode: "write",
-        maxResponseBytes: HTTP_RESPONSE_BODY_LIMIT_BYTES,
-        init,
-      });
-    },
-    async patch(input) {
-      const { init, url, fetch } = prepareConnectedWrite("PATCH", input);
-      return requestEnvelope(fetch, url, {
-        code: "HTTP_REQUEST_FAILED",
-        failureMode: "write",
-        maxResponseBytes: HTTP_RESPONSE_BODY_LIMIT_BYTES,
-        init,
-      });
-    },
+    get: async (input) => await send("GET", input),
+    post: async (input) => await send("POST", input),
+    put: async (input) => await send("PUT", input),
+    patch: async (input) => await send("PATCH", input),
   };
 }
