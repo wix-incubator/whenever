@@ -31,12 +31,8 @@ describe("the adapters package", () => {
 
   it("keeps transport helpers off the public entry point", () => {
     expect(Object.keys(manifest.exports)).toContain("./internal");
-    expect(Object.keys(adapters)).toEqual(
-      expect.not.arrayContaining([
-        "requestJson",
-        "strictJsonSnapshot",
-        "prepareHttpGetInput",
-      ]),
-    );
+    for (const helper of ["requestJson", "strictJsonSnapshot", "prepareHttpGetInput"]) {
+      expect(adapters).not.toHaveProperty(helper);
+    }
   });
 });
