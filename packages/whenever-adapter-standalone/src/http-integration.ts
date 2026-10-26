@@ -23,6 +23,11 @@ import { strictJsonSnapshot, strictJsonViolation } from "./strict-json";
 export interface HttpConnection {
   readonly baseUrl: string;
   readonly headers: Readonly<Record<string, string>>;
+  /**
+   * A credential the provider reads from the path, sent as the first segment below `baseUrl`: a
+   * request written as `${baseUrl}/sendMessage` goes to `${baseUrl}/${pathSegment}/sendMessage`.
+   */
+  readonly pathSegment?: string;
 }
 
 export interface HttpIntegrationOptions {
@@ -239,9 +244,9 @@ function connect(
   input: HttpRequestInput,
   url: URL,
   headers: Headers,
-): boolean {
+): string[] | undefined {
   const name = input.connection;
-  if (name === undefined) return false;
+  if (name === undefined) return undefined;
   const connection =
     connections !== undefined && Object.prototype.hasOwnProperty.call(connections, name)
       ? connections[name]
@@ -254,6 +259,7 @@ function connect(
       `connection "${name}" sends only to ${connection.baseUrl}`,
     );
   }
+  const credentials: string[] = [];
   for (const [header, value] of Object.entries(connection.headers)) {
     if (headers.has(header)) {
       throw invalidHttpRequest(
@@ -261,8 +267,32 @@ function connect(
       );
     }
     headers.set(header, value);
+    credentials.push(...[value, ...value.split(/\s+/u)].filter(maskable));
   }
-  return true;
+  const { pathSegment } = connection;
+  if (pathSegment !== undefined) {
+    insertPathSegment(name, connection.baseUrl, pathSegment, url);
+    credentials.push(pathSegment, ...pathSegment.split(/[^\w-]+/u).filter(maskable));
+  }
+  return credentials;
+}
+
+// Short values such as a version header would mask ordinary words of a provider's explanation.
+const MIN_MASKED_CREDENTIAL_LENGTH = 8;
+
+function maskable(value: string): boolean {
+  return value.trim().length >= MIN_MASKED_CREDENTIAL_LENGTH;
+}
+
+// RFC 3986 pchar without percent-encoding: anything else the URL parser would drop, re-encode or read as structure.
+const PATH_SEGMENT = /^[A-Za-z0-9\-._~!$&'()*+,;=:@]+$/u;
+
+function insertPathSegment(name: string, baseUrl: string, segment: string, url: URL): void {
+  if (segment === "." || segment === ".." || !PATH_SEGMENT.test(segment)) {
+    throw invalidHttpRequest(`connection "${name}" holds a path credential that is not one path segment`);
+  }
+  const basePath = new URL(baseUrl).pathname.replace(/\/$/u, "");
+  url.pathname = `${basePath}/${segment}${url.pathname.slice(basePath.length)}`;
 }
 
 export function sendsWithinConnection(baseUrl: string, url: URL): boolean {
@@ -305,9 +335,10 @@ export function createHttpIntegrationFromEnv({
     const url = targetUrl(input);
     const request = input as HttpWriteInput;
     const headers = requestHeaders(request.headers);
-    const connected = connect(connections, request, url, headers);
-    return requestEnvelope(connected ? connectedFetch : unconnectedFetch, url, {
+    const credentials = connect(connections, request, url, headers);
+    return requestEnvelope(credentials === undefined ? unconnectedFetch : connectedFetch, url, {
       code: "HTTP_REQUEST_FAILED",
+      ...(credentials === undefined ? {} : { credentials }),
       failureMode: method === "GET" ? "safe" : "write",
       maxResponseBytes: HTTP_RESPONSE_BODY_LIMIT_BYTES,
       init: method === "GET" ? { method, headers } : writeInit(method, request, headers),
