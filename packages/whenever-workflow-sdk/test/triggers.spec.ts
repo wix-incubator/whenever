@@ -180,6 +180,48 @@ describe("coarse schedule builders", () => {
   });
 });
 
+describe("schedule windows", () => {
+  it("daily carries a window in minutes", () => {
+    expect(daily({ key: "post", at: "08:00", within: "1h", tz: "Europe/Vilnius" })).toEqual({
+      type: "schedule",
+      key: "post",
+      cron: "0 8 * * *",
+      tz: "Europe/Vilnius",
+      windowMinutes: 60,
+    });
+  });
+
+  it("weekly and monthly carry a window", () => {
+    expect(weekly({ key: "week", day: "friday", at: "18:00", within: "30m" }).windowMinutes).toBe(30);
+    expect(monthly({ key: "month", dayOfMonth: 15, within: "12h" }).windowMinutes).toBe(720);
+  });
+
+  it("schedule carries a window on a cron that fires at most once a day", () => {
+    expect(schedule("0 8 * * 1-5", { key: "weekdays", within: "45m" })).toEqual({
+      type: "schedule",
+      key: "weekdays",
+      cron: "0 8 * * 1-5",
+      windowMinutes: 45,
+    });
+    expect(schedule("@daily", { key: "nightly", within: "2h" }).windowMinutes).toBe(120);
+  });
+
+  it.each(["* 8 * * *", "0 8,12 * * *", "*/15 * * * *", "0 8-9 * * *", "@hourly"])(
+    "schedule refuses a window on %s, which fires more than once a day",
+    (cron) => {
+      expect(() => schedule(cron, { key: "often", within: "1h" })).toThrow(/at most once a day/);
+    },
+  );
+
+  it.each(["0m", "13h", "721m", "1.5h", "1d", "60", ""])("refuses the window %j", (within) => {
+    expect(() => daily({ key: "post", at: "08:00", within })).toThrow(/from 1 minute to 12 hours/);
+  });
+
+  it("omits the window when none is given", () => {
+    expect("windowMinutes" in daily({ key: "post", at: "08:00" })).toBe(false);
+  });
+});
+
 describe("every", () => {
   it("builds a minute interval", () => {
     expect(every("15m", { key: "poll" })).toEqual({ type: "schedule", key: "poll", cron: "*/15 * * * *" });

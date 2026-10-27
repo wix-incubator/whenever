@@ -58,11 +58,13 @@ export { createWorkflowContext } from "./runtime";
 export type {
   DailyOptions,
   EventOptions,
+  EveryOptions,
   HourlyOptions,
   ManualOptions,
   MonthlyOptions,
   OnceOptions,
   ScheduleOptions,
+  ScheduleWindowOptions,
   TriggerIdentity,
   WebhookOptions,
   Weekday,

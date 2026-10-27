@@ -107,6 +107,8 @@ export interface ScheduleTrigger {
   key: string;
   cron: string;
   tz?: string;
+  /** Minutes after each cron time within which the host picks that occurrence's run time. */
+  windowMinutes?: number;
 }
 
 export interface ManualTrigger {

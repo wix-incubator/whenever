@@ -11,7 +11,21 @@ export interface TriggerIdentity {
   key: string;
 }
 
-export interface ScheduleOptions extends TriggerIdentity {
+export interface ScheduleWindowOptions {
+  /**
+   * Runs each occurrence at a time picked inside this window after its scheduled time, so the
+   * time differs from one occurrence to the next. Written as `"<n>m"` or `"<n>h"`, from 1 minute
+   * to 12 hours: `daily({ key: "post", at: "08:00", within: "1h" })` runs once a day between
+   * 08:00 and 09:00.
+   */
+  within?: string;
+}
+
+export interface ScheduleOptions extends TriggerIdentity, ScheduleWindowOptions {
+  tz?: string;
+}
+
+export interface EveryOptions extends TriggerIdentity {
   tz?: string;
 }
 
@@ -41,7 +55,7 @@ export interface HourlyOptions extends TriggerIdentity {
   tz?: string;
 }
 
-export interface DailyOptions extends TriggerIdentity {
+export interface DailyOptions extends TriggerIdentity, ScheduleWindowOptions {
   /**
    * Time of day as "HH:MM" on a 24-hour clock, such as "09:00" or "18:30".
    * Defaults to midnight.
@@ -54,7 +68,7 @@ export interface DailyOptions extends TriggerIdentity {
   tz?: string;
 }
 
-export interface WeeklyOptions extends TriggerIdentity {
+export interface WeeklyOptions extends TriggerIdentity, ScheduleWindowOptions {
   /** Weekday name, lowercase. Defaults to "monday". */
   day?: Weekday;
   /**
@@ -66,7 +80,7 @@ export interface WeeklyOptions extends TriggerIdentity {
   tz?: string;
 }
 
-export interface MonthlyOptions extends TriggerIdentity {
+export interface MonthlyOptions extends TriggerIdentity, ScheduleWindowOptions {
   /** Day of the month, an integer 1-31. Defaults to 1. */
   dayOfMonth?: number;
   /**
@@ -79,6 +93,8 @@ export interface MonthlyOptions extends TriggerIdentity {
 }
 
 const CRON_ALIASES = new Set(["@hourly", "@daily", "@weekly", "@monthly"]);
+const AT_MOST_DAILY_ALIASES = new Set(["@daily", "@weekly", "@monthly"]);
+const MAX_WINDOW_MINUTES = 12 * 60;
 
 const WEEKDAYS: Weekday[] = [
   "sunday",
@@ -101,6 +117,9 @@ const WEEKDAYS: Weekday[] = [
  * Only the field count is checked here; field ranges and `tz` identifiers are
  * not validated. Prefer `hourly`, `daily`, `weekly`, `monthly`, or `every`
  * when one of them expresses the intent.
+ *
+ * `within` needs a cron that fires at most once a day, with a single minute and
+ * hour, such as `"0 8 * * 1-5"` for weekdays at 08:00.
  */
 export function schedule(cron: string, options: ScheduleOptions): ScheduleTrigger {
   const key = stableKey("schedule", options);
@@ -112,9 +131,21 @@ export function schedule(cron: string, options: ScheduleOptions): ScheduleTrigge
       `invalid cron "${cron}": expected 5 fields (minute hour day-of-month month day-of-week) or one of @hourly/@daily/@weekly/@monthly`,
     );
   }
-  return options.tz === undefined
-    ? { type: "schedule", key, cron: normalized }
-    : { type: "schedule", key, cron: normalized, tz: options.tz };
+  const trigger: ScheduleTrigger =
+    options.tz === undefined
+      ? { type: "schedule", key, cron: normalized }
+      : { type: "schedule", key, cron: normalized, tz: options.tz };
+  if (options.within === undefined) return trigger;
+  const [minute, hour] = normalized.split(/\s+/);
+  if (
+    !AT_MOST_DAILY_ALIASES.has(normalized) &&
+    !(/^\d+$/.test(minute) && /^\d+$/.test(hour ?? ""))
+  ) {
+    throw new Error(
+      `invalid cron "${cron}" for a window: "within" needs a cron that fires at most once a day, with a single minute and hour such as "0 8 * * 1-5"`,
+    );
+  }
+  return { ...trigger, windowMinutes: windowMinutes(options.within) };
 }
 
 /** Declares a trigger that never fires automatically: a person runs it on demand. */
@@ -171,6 +202,7 @@ export function daily(options: DailyOptions): ScheduleTrigger {
   return schedule(`${String(minute)} ${String(hour)} * * *`, {
     key,
     tz: options.tz,
+    within: options.within,
   });
 }
 
@@ -188,7 +220,7 @@ export function weekly(options: WeeklyOptions): ScheduleTrigger {
   }
   return schedule(
     `${String(minute)} ${String(hour)} * * ${String(dayOfWeek)}`,
-    { key, tz: options.tz },
+    { key, tz: options.tz, within: options.within },
   );
 }
 
@@ -209,7 +241,7 @@ export function monthly(options: MonthlyOptions): ScheduleTrigger {
   }
   return schedule(
     `${String(minute)} ${String(hour)} ${String(dayOfMonth)} * *`,
-    { key, tz: options.tz },
+    { key, tz: options.tz, within: options.within },
   );
 }
 
@@ -221,7 +253,7 @@ export function monthly(options: MonthlyOptions): ScheduleTrigger {
  * so that firings stay aligned across every hour or day. `"7m"` and `"90m"`
  * are rejected; use `schedule` for a pattern that does not fit.
  */
-export function every(interval: string, options: ScheduleOptions): ScheduleTrigger {
+export function every(interval: string, options: EveryOptions): ScheduleTrigger {
   const key = stableKey("every", options);
   const match = /^(\d+)(m|h)$/.exec(interval.trim());
   if (match === null) {
@@ -327,6 +359,17 @@ function stableKey(builder: string, options: TriggerIdentity | undefined): strin
     throw new Error(`invalid ${builder} key: expected a non-empty stable key`);
   }
   return key;
+}
+
+function windowMinutes(within: string): number {
+  const match = /^(\d+)(m|h)$/.exec(within.trim());
+  const minutes = match === null ? Number.NaN : Number(match[1]) * (match[2] === "h" ? 60 : 1);
+  if (!Number.isInteger(minutes) || minutes < 1 || minutes > MAX_WINDOW_MINUTES) {
+    throw new Error(
+      `invalid window "${within}": expected "<n>m" or "<n>h" from 1 minute to 12 hours, such as "30m" or "2h"`,
+    );
+  }
+  return minutes;
 }
 
 function parseTimeOfDay(at: string): { hour: number; minute: number } {
