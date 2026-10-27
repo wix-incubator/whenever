@@ -252,6 +252,35 @@ describe("schedule windows", () => {
     );
   });
 
+  it("refuses during hours that no window of a schedule with several start times reaches", () => {
+    expect(() => every("2h", { key: "k", within: "30m", during: { from: "09:00", to: "10:00" } })).toThrow(
+      /no time between 09:00 and 10:00 falls inside any/,
+    );
+  });
+
+  it("accepts during hours that only some windows reach", () => {
+    expect(hourly({ key: "k", within: "60m", during: { from: "09:00", to: "17:00" } }).window).toEqual({
+      minutes: 60,
+      during: { from: "09:00", to: "17:00" },
+    });
+  });
+
+  it("refuses more runs than the during hours leave room for", () => {
+    expect(() => daily({ key: "k", at: "08:00", within: "1h", during: { from: "08:50", to: "09:00" }, times: 11 })).toThrow(
+      /room for only 10 runs/,
+    );
+  });
+
+  it("refuses during on a one-time run, which has no time zone", () => {
+    expect(() => once("2026-11-03T08:00:00Z", { key: "k", within: "4h", during: { from: "09:00", to: "10:00" } })).toThrow(
+      /needs a time zone/,
+    );
+  });
+
+  it("reads a stepped day field as set, keeping the window under the gap of either reading", () => {
+    expect(() => schedule("0 8 */2 * 1", { key: "k", within: "2d" })).toThrow(/at most 1d/);
+  });
+
   it("refuses during hours that start and end at the same time", () => {
     expect(() => daily({ key: "k", within: "24h", during: { from: "09:00", to: "09:00" } })).toThrow(/same time/);
   });

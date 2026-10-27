@@ -3,14 +3,14 @@ import type { ScheduleWindow } from "./types";
 export interface ScheduleWindowOptions {
   /**
    * Runs each occurrence at a time picked inside this window after its scheduled time, so the
-   * time differs from one occurrence to the next. Written as `"<n>m"`, `"<n>h"` or `"<n>d"`, up
-   * to the time between two runs of the schedule and at most 31 days:
+   * time differs from one occurrence to the next. Written as `"<n>m"`, `"<n>h"` or `"<n>d"` of
+   * the schedule's local clock, up to the time between two runs and at most 31 days:
    * `daily({ key: "post", at: "08:00", within: "1h" })` runs once a day between 08:00 and 09:00.
    */
   within?: string;
   /**
    * Only picks times inside these hours of the day, in the schedule's time zone. `from` may be
-   * later than `to` to cross midnight. Needs `within`:
+   * later than `to` to cross midnight. Needs `within`, and is not accepted by `once`:
    * `weekly({ key: "check-in", day: "monday", at: "00:00", within: "5d", during: { from: "09:00", to: "17:00" } })`
    * runs once a week at a random time during working hours, Monday to Friday.
    */
@@ -103,9 +103,9 @@ interface CronShape {
   readonly gapMinutes: number;
 }
 
-// The shortest time between two firings, over eight calendar years so leap days and every
-// month length occur. Day-of-month and day-of-week both set are read as either matching, which
-// can only shorten the gap and so keeps the window bound safe.
+// The shortest time between two firings on the local clock, over eight calendar years so leap
+// days and every month length occur. Any day field other than a bare "*" counts as set, and two
+// set day fields are read as either matching; both only shorten the gap, which keeps windows apart.
 function cronShape(cron: string): CronShape | undefined {
   const fields = cron.split(/\s+/);
   if (fields.length !== 5) return undefined;
@@ -118,8 +118,8 @@ function cronShape(cron: string): CronShape | undefined {
     return undefined;
   }
   const times = hours.flatMap((hour) => minutes.map((minute) => hour * 60 + minute));
-  const anyDayOfMonth = fields[2].startsWith("*");
-  const anyDayOfWeek = fields[4].startsWith("*");
+  const anyDayOfMonth = fields[2] === "*";
+  const anyDayOfWeek = fields[4] === "*";
   const matchingDays: number[] = [];
   const first = Date.UTC(2024, 0, 1);
   for (let day = 0; day < 8 * 366; day += 1) {
@@ -155,7 +155,7 @@ function lowerWindow(
   options: ScheduleWindowOptions,
   maxMinutes: number,
   describe: string,
-  start: number | undefined,
+  starts: readonly number[],
 ): ScheduleWindow | undefined {
   if (options.within === undefined) {
     if (options.during !== undefined || options.times !== undefined) {
@@ -183,16 +183,23 @@ function lowerWindow(
       throw new Error(`invalid during: "from" and "to" are the same time, so no time is allowed`);
     }
     during = { from: formatTimeOfDay(from), to: formatTimeOfDay(to) };
-    if (start !== undefined) {
-      let allowed = 0;
+    const allowed = starts.map((start) => {
+      let count = 0;
       for (let offset = 0; offset < minutes; offset += 1) {
-        if (inDuring((start + offset) % DAY_MINUTES, fromMinute, toMinute)) allowed += 1;
+        if (inDuring((start + offset) % DAY_MINUTES, fromMinute, toMinute)) count += 1;
       }
-      if (allowed === 0) {
-        throw new Error(
-          `invalid during for ${describe}: no time between ${during.from} and ${during.to} falls inside the ${formatMinutes(minutes)} window`,
-        );
-      }
+      return count;
+    });
+    if (allowed.every((count) => count === 0)) {
+      throw new Error(
+        `invalid during for ${describe}: no time between ${during.from} and ${during.to} falls inside any ${formatMinutes(minutes)} window`,
+      );
+    }
+    const fewest = Math.min(...allowed.filter((count) => count > 0));
+    if (times > fewest) {
+      throw new Error(
+        `invalid times "${String(times)}": a window has room for only ${String(fewest)} runs between ${during.from} and ${during.to}`,
+      );
     }
   }
   if (times > minutes) {
@@ -207,17 +214,19 @@ function lowerWindow(
 
 export function recurringWindow(cron: string, options: ScheduleWindowOptions): ScheduleWindow | undefined {
   const describe = `cron "${cron}"`;
-  if (options.within === undefined) return lowerWindow(options, MAX_WINDOW_MINUTES, describe, undefined);
+  if (options.within === undefined) return lowerWindow(options, MAX_WINDOW_MINUTES, describe, []);
   const shape = cronShape(ALIAS_CRONS[cron] ?? cron);
   if (shape === undefined) {
     throw new Error(
       `invalid ${describe} for a window: use numbers, "*", ranges, steps and lists only, or a builder such as daily, weekly or monthly`,
     );
   }
-  const start = shape.times.length === 1 ? shape.times[0] : undefined;
-  return lowerWindow(options, Math.min(shape.gapMinutes, MAX_WINDOW_MINUTES), describe, start);
+  return lowerWindow(options, Math.min(shape.gapMinutes, MAX_WINDOW_MINUTES), describe, shape.times);
 }
 
 export function onceWindow(at: string, options: ScheduleWindowOptions): ScheduleWindow | undefined {
-  return lowerWindow(options, MAX_WINDOW_MINUTES, `the one-time run at "${at}"`, undefined);
+  if (options.during !== undefined) {
+    throw new Error(`"during" needs a time zone, which a one-time run has none of; set its window with "at" and "within"`);
+  }
+  return lowerWindow(options, MAX_WINDOW_MINUTES, `the one-time run at "${at}"`, []);
 }
