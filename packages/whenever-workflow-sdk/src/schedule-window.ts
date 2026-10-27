@@ -3,8 +3,8 @@ import type { ScheduleWindow } from "./types";
 export interface ScheduleWindowOptions {
   /**
    * Runs each occurrence at a time picked inside this window after its scheduled time, so the
-   * time differs from one occurrence to the next. Written as `"<n>m"`, `"<n>h"` or `"<n>d"` of
-   * the schedule's local clock, up to the time between two runs and at most 31 days:
+   * time differs from one occurrence to the next. Written as `"<n>m"`, `"<n>h"` or `"<n>d"`, up
+   * to the time between two runs and at most 31 days:
    * `daily({ key: "post", at: "08:00", within: "1h" })` runs once a day between 08:00 and 09:00.
    */
   within?: string;
