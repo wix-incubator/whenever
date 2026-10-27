@@ -1,13 +1,12 @@
-import { onceWindow, parseTimeOfDay, recurringWindow, type ScheduleWindowOptions } from "./schedule-window";
+import { onceWindow, parseTimeOfDay, recurringWindow } from "./schedule-window";
 import type {
   EventTrigger,
   ManualTrigger,
   OnceTrigger,
   ScheduleTrigger,
+  ScheduleWindowOptions,
   WebhookTrigger,
 } from "./types";
-
-export type { ScheduleWindowOptions } from "./schedule-window";
 
 export interface TriggerIdentity {
   /** Stable name of this trigger, unique across the workflow's triggers; runs carry it as `ctx.trigger.key`. */
