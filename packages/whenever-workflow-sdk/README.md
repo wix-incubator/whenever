@@ -32,6 +32,9 @@ as `Date.now()` and `Math.random()`. Use `ctx.log()` for annotations and never l
 Trigger constructors declare data. Every trigger needs a non-empty, workflow-local `key`.
 `manual`, `schedule`, `once`, `interval`, `hourly`, `daily`, `weekly` and `monthly` describe manual
 or scheduled invocations. Cron expressions have five fields; time-of-day values use `HH:MM`.
+Every schedule and `once` accept `within`, such as `"1h"` or `"5d"`: the host runs each occurrence at a
+time it picks inside that window, which is at most the time between two runs. `during` keeps picked
+times inside hours of the day, and `times` runs several times per window, spread across it.
 `webhook` describes an unverified HTTP endpoint. Sender-specific helpers are exported from
 `@wix/whenever-workflow-sdk/webhooks`. `event` declares a provider event interpreted by the host.
 
