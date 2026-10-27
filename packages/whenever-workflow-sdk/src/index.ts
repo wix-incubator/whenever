@@ -93,6 +93,7 @@ export type {
   OnceTriggerContext,
   ScheduleTrigger,
   ScheduleTriggerContext,
+  ScheduleWindow,
   Trigger,
   TriggerFields,
   WebhookAuth,

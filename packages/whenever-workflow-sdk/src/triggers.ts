@@ -1,3 +1,4 @@
+import { onceWindow, parseTimeOfDay, recurringWindow, type ScheduleWindowOptions } from "./schedule-window";
 import type {
   EventTrigger,
   ManualTrigger,
@@ -6,32 +7,24 @@ import type {
   WebhookTrigger,
 } from "./types";
 
+export type { ScheduleWindowOptions } from "./schedule-window";
+
 export interface TriggerIdentity {
   /** Stable name of this trigger, unique across the workflow's triggers; runs carry it as `ctx.trigger.key`. */
   key: string;
-}
-
-export interface ScheduleWindowOptions {
-  /**
-   * Runs each occurrence at a time picked inside this window after its scheduled time, so the
-   * time differs from one occurrence to the next. Written as `"<n>m"` or `"<n>h"`, from 1 minute
-   * to 12 hours: `daily({ key: "post", at: "08:00", within: "1h" })` runs once a day between
-   * 08:00 and 09:00.
-   */
-  within?: string;
 }
 
 export interface ScheduleOptions extends TriggerIdentity, ScheduleWindowOptions {
   tz?: string;
 }
 
-export interface EveryOptions extends TriggerIdentity {
+export interface EveryOptions extends TriggerIdentity, ScheduleWindowOptions {
   tz?: string;
 }
 
 export type ManualOptions = TriggerIdentity;
 
-export type OnceOptions = TriggerIdentity;
+export type OnceOptions = TriggerIdentity & ScheduleWindowOptions;
 
 export interface EventOptions {
   key: string;
@@ -48,7 +41,7 @@ export type Weekday =
   | "friday"
   | "saturday";
 
-export interface HourlyOptions extends TriggerIdentity {
+export interface HourlyOptions extends TriggerIdentity, ScheduleWindowOptions {
   /** Minute past the hour, an integer 0-59. Defaults to 0. */
   minute?: number;
   /** IANA timezone the schedule is interpreted in, such as "Europe/Vilnius". */
@@ -93,8 +86,6 @@ export interface MonthlyOptions extends TriggerIdentity, ScheduleWindowOptions {
 }
 
 const CRON_ALIASES = new Set(["@hourly", "@daily", "@weekly", "@monthly"]);
-const AT_MOST_DAILY_ALIASES = new Set(["@daily", "@weekly", "@monthly"]);
-const MAX_WINDOW_MINUTES = 12 * 60;
 
 const WEEKDAYS: Weekday[] = [
   "sunday",
@@ -118,8 +109,9 @@ const WEEKDAYS: Weekday[] = [
  * not validated. Prefer `hourly`, `daily`, `weekly`, `monthly`, or `every`
  * when one of them expresses the intent.
  *
- * `within` needs a cron that fires at most once a day, with a single minute and
- * hour, such as `"0 8 * * 1-5"` for weekdays at 08:00.
+ * A window from `within` can be at most the shortest time between two runs:
+ * `schedule("0 8 * * 1-5", { key, within: "1h" })` runs on weekdays between
+ * 08:00 and 09:00. Crons using `L`, `W`, `#` or names take no window.
  */
 export function schedule(cron: string, options: ScheduleOptions): ScheduleTrigger {
   const key = stableKey("schedule", options);
@@ -135,17 +127,8 @@ export function schedule(cron: string, options: ScheduleOptions): ScheduleTrigge
     options.tz === undefined
       ? { type: "schedule", key, cron: normalized }
       : { type: "schedule", key, cron: normalized, tz: options.tz };
-  if (options.within === undefined) return trigger;
-  const [minute, hour] = normalized.split(/\s+/);
-  if (
-    !AT_MOST_DAILY_ALIASES.has(normalized) &&
-    !(/^\d+$/.test(minute) && /^\d+$/.test(hour ?? ""))
-  ) {
-    throw new Error(
-      `invalid cron "${cron}" for a window: "within" needs a cron that fires at most once a day, with a single minute and hour such as "0 8 * * 1-5"`,
-    );
-  }
-  return { ...trigger, windowMinutes: windowMinutes(options.within) };
+  const window = recurringWindow(normalized, options);
+  return window === undefined ? trigger : { ...trigger, window };
 }
 
 /** Declares a trigger that never fires automatically: a person runs it on demand. */
@@ -177,7 +160,8 @@ export function once(at: string, options: OnceOptions): OnceTrigger {
       `invalid one-time date "${at}": expected an absolute ISO 8601 instant like "2026-08-01T09:00:00Z"${hint}`,
     );
   }
-  return { type: "once", key, at: normalized };
+  const window = onceWindow(normalized, options);
+  return window === undefined ? { type: "once", key, at: normalized } : { type: "once", key, at: normalized, window };
 }
 
 /** Declares a trigger that fires once an hour, at `minute` past the hour. */
@@ -189,7 +173,7 @@ export function hourly(options: HourlyOptions): ScheduleTrigger {
       `invalid minute "${String(options.minute)}": expected an integer 0-59`,
     );
   }
-  return schedule(`${String(minute)} * * * *`, { key, tz: options.tz });
+  return schedule(`${String(minute)} * * * *`, { key, tz: options.tz, ...windowOptions(options) });
 }
 
 /**
@@ -202,7 +186,7 @@ export function daily(options: DailyOptions): ScheduleTrigger {
   return schedule(`${String(minute)} ${String(hour)} * * *`, {
     key,
     tz: options.tz,
-    within: options.within,
+    ...windowOptions(options),
   });
 }
 
@@ -220,7 +204,7 @@ export function weekly(options: WeeklyOptions): ScheduleTrigger {
   }
   return schedule(
     `${String(minute)} ${String(hour)} * * ${String(dayOfWeek)}`,
-    { key, tz: options.tz, within: options.within },
+    { key, tz: options.tz, ...windowOptions(options) },
   );
 }
 
@@ -241,7 +225,7 @@ export function monthly(options: MonthlyOptions): ScheduleTrigger {
   }
   return schedule(
     `${String(minute)} ${String(hour)} ${String(dayOfMonth)} * *`,
-    { key, tz: options.tz, within: options.within },
+    { key, tz: options.tz, ...windowOptions(options) },
   );
 }
 
@@ -268,14 +252,14 @@ export function every(interval: string, options: EveryOptions): ScheduleTrigger 
         `invalid interval "${interval}": minutes must evenly divide 60`,
       );
     }
-    return schedule(`*/${String(value)} * * * *`, { key, tz: options.tz });
+    return schedule(`*/${String(value)} * * * *`, { key, tz: options.tz, ...windowOptions(options) });
   }
   if (value < 1 || value >= 24 || 24 % value !== 0) {
     throw new Error(
       `invalid interval "${interval}": hours must evenly divide 24`,
     );
   }
-  return schedule(`0 */${String(value)} * * *`, { key, tz: options.tz });
+  return schedule(`0 */${String(value)} * * *`, { key, tz: options.tz, ...windowOptions(options) });
 }
 
 export interface WebhookOptions {
@@ -361,35 +345,7 @@ function stableKey(builder: string, options: TriggerIdentity | undefined): strin
   return key;
 }
 
-function windowMinutes(within: string): number {
-  const match = /^(\d+)(m|h)$/.exec(within.trim());
-  const minutes = match === null ? Number.NaN : Number(match[1]) * (match[2] === "h" ? 60 : 1);
-  if (!Number.isInteger(minutes) || minutes < 1 || minutes > MAX_WINDOW_MINUTES) {
-    throw new Error(
-      `invalid window "${within}": expected "<n>m" or "<n>h" from 1 minute to 12 hours, such as "30m" or "2h"`,
-    );
-  }
-  return minutes;
+function windowOptions({ within, during, times }: ScheduleWindowOptions): ScheduleWindowOptions {
+  return { within, during, times };
 }
 
-function parseTimeOfDay(at: string): { hour: number; minute: number } {
-  const normalized = at.trim();
-  const match = /^(\d{1,2}):(\d{2})$/.exec(normalized);
-  if (match === null) {
-    const withSeconds = /^(\d{1,2}:\d{2}):\d{2}$/.exec(normalized);
-    if (withSeconds !== null) {
-      throw new Error(
-        `invalid time "${at}": schedules have minute granularity, so a seconds component cannot be honored — use "${withSeconds[1]}"`,
-      );
-    }
-    throw new Error(`invalid time "${at}": expected "HH:MM" (24-hour)`);
-  }
-  const hour = Number(match[1]);
-  const minute = Number(match[2]);
-  if (hour > 23 || minute > 59) {
-    throw new Error(
-      `invalid time "${at}": hour must be 0-23 and minute must be 0-59`,
-    );
-  }
-  return { hour, minute };
-}

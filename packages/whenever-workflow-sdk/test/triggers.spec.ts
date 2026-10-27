@@ -187,38 +187,91 @@ describe("schedule windows", () => {
       key: "post",
       cron: "0 8 * * *",
       tz: "Europe/Vilnius",
-      windowMinutes: 60,
+      window: { minutes: 60 },
     });
-  });
-
-  it("weekly and monthly carry a window", () => {
-    expect(weekly({ key: "week", day: "friday", at: "18:00", within: "30m" }).windowMinutes).toBe(30);
-    expect(monthly({ key: "month", dayOfMonth: 15, within: "12h" }).windowMinutes).toBe(720);
-  });
-
-  it("schedule carries a window on a cron that fires at most once a day", () => {
-    expect(schedule("0 8 * * 1-5", { key: "weekdays", within: "45m" })).toEqual({
-      type: "schedule",
-      key: "weekdays",
-      cron: "0 8 * * 1-5",
-      windowMinutes: 45,
-    });
-    expect(schedule("@daily", { key: "nightly", within: "2h" }).windowMinutes).toBe(120);
-  });
-
-  it.each(["* 8 * * *", "0 8,12 * * *", "*/15 * * * *", "0 8-9 * * *", "@hourly"])(
-    "schedule refuses a window on %s, which fires more than once a day",
-    (cron) => {
-      expect(() => schedule(cron, { key: "often", within: "1h" })).toThrow(/at most once a day/);
-    },
-  );
-
-  it.each(["0m", "13h", "721m", "1.5h", "1d", "60", ""])("refuses the window %j", (within) => {
-    expect(() => daily({ key: "post", at: "08:00", within })).toThrow(/from 1 minute to 12 hours/);
   });
 
   it("omits the window when none is given", () => {
-    expect("windowMinutes" in daily({ key: "post", at: "08:00" })).toBe(false);
+    expect("window" in daily({ key: "post", at: "08:00" })).toBe(false);
+    expect("window" in once("2026-11-03T08:00:00Z", { key: "launch" })).toBe(false);
+  });
+
+  it.each([
+    ["hourly", () => hourly({ key: "k", within: "60m" }), 60],
+    ["every 15 minutes", () => every("15m", { key: "k", within: "15m" }), 15],
+    ["every 2 hours", () => every("2h", { key: "k", within: "2h" }), 120],
+    ["daily", () => daily({ key: "k", within: "24h" }), 1440],
+    ["weekly", () => weekly({ key: "k", within: "7d" }), 10080],
+    ["monthly on the 1st", () => monthly({ key: "k", within: "28d" }), 40320],
+    ["monthly on the 31st", () => monthly({ key: "k", dayOfMonth: 31, within: "31d" }), 44640],
+    ["weekdays", () => schedule("0 8 * * 1-5", { key: "k", within: "1d" }), 1440],
+    ["twice a day", () => schedule("0 8,12 * * *", { key: "k", within: "4h" }), 240],
+    ["an alias", () => schedule("@weekly", { key: "k", within: "7d" }), 10080],
+    ["a one-time run", () => once("2026-11-03T08:00:00Z", { key: "k", within: "31d" }), 44640],
+  ])("accepts a window as long as the gap between runs of %s", (_name, build, minutes) => {
+    expect(build().window).toEqual({ minutes });
+  });
+
+  it.each([
+    ["hourly", () => hourly({ key: "k", within: "61m" }), /at most 1h/],
+    ["every 15 minutes", () => every("15m", { key: "k", within: "16m" }), /at most 15m/],
+    ["daily", () => daily({ key: "k", within: "25h" }), /at most 1d/],
+    ["weekly", () => weekly({ key: "k", within: "8d" }), /at most 7d/],
+    ["monthly on the 1st", () => monthly({ key: "k", within: "29d" }), /at most 28d/],
+    ["weekdays", () => schedule("0 8 * * 1-5", { key: "k", within: "2d" }), /at most 1d/],
+    ["twice a day", () => schedule("0 8,12 * * *", { key: "k", within: "5h" }), /at most 4h/],
+    ["every minute of an hour", () => schedule("* 8 * * *", { key: "k", within: "2m" }), /at most 1m/],
+  ])("refuses a window longer than the gap between runs of %s", (_name, build, message) => {
+    expect(build).toThrow(message);
+  });
+
+  it.each(["0 8 L * *", "0 8 * * MON", "0 8 * * 1#2", "0 8 15W * *"])("refuses a window on the cron %s it cannot measure", (cron) => {
+    expect(() => schedule(cron, { key: "k", within: "1h" })).toThrow(/numbers, "\*", ranges, steps and lists only/);
+  });
+
+  it.each(["0m", "32d", "1.5h", "1w", "60", ""])("refuses the window %j", (within) => {
+    expect(() => daily({ key: "post", at: "08:00", within })).toThrow(/from 1 minute to 31 days/);
+  });
+
+  it("keeps picked times inside the hours given by during", () => {
+    expect(
+      weekly({ key: "k", day: "monday", at: "00:00", within: "5d", during: { from: "9:00", to: "17:00" } }).window,
+    ).toEqual({ minutes: 7200, during: { from: "09:00", to: "17:00" } });
+  });
+
+  it("accepts during hours that cross midnight", () => {
+    expect(daily({ key: "k", at: "20:00", within: "12h", during: { from: "22:00", to: "06:00" } }).window?.during).toEqual({
+      from: "22:00",
+      to: "06:00",
+    });
+  });
+
+  it("refuses during hours that no time in the window falls inside", () => {
+    expect(() => daily({ key: "k", at: "08:00", within: "1h", during: { from: "12:00", to: "17:00" } })).toThrow(
+      /no time between 12:00 and 17:00/,
+    );
+  });
+
+  it("refuses during hours that start and end at the same time", () => {
+    expect(() => daily({ key: "k", within: "24h", during: { from: "09:00", to: "09:00" } })).toThrow(/same time/);
+  });
+
+  it("carries the number of runs per window", () => {
+    expect(daily({ key: "k", at: "09:00", within: "8h", times: 3 }).window).toEqual({ minutes: 480, times: 3 });
+    expect(daily({ key: "k", at: "09:00", within: "8h", times: 1 }).window).toEqual({ minutes: 480 });
+  });
+
+  it.each([0, 25, 1.5])("refuses %j runs per window", (times) => {
+    expect(() => daily({ key: "k", within: "8h", times })).toThrow(/from 1 to 24/);
+  });
+
+  it("refuses more runs than a window has minutes", () => {
+    expect(() => hourly({ key: "k", within: "5m", times: 6 })).toThrow(/at most 5 runs/);
+  });
+
+  it("refuses during or times without a window", () => {
+    expect(() => daily({ key: "k", times: 2 })).toThrow(/need "within"/);
+    expect(() => daily({ key: "k", during: { from: "09:00", to: "17:00" } })).toThrow(/need "within"/);
   });
 });
 

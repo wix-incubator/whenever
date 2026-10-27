@@ -107,8 +107,17 @@ export interface ScheduleTrigger {
   key: string;
   cron: string;
   tz?: string;
-  /** Minutes after each cron time within which the host picks that occurrence's run time. */
-  windowMinutes?: number;
+  window?: ScheduleWindow;
+}
+
+/** Where the host picks each occurrence's run times, after the time it is scheduled for. */
+export interface ScheduleWindow {
+  /** Length of the window in minutes. */
+  minutes: number;
+  /** Hours of the day, "HH:MM" in the schedule's time zone, that picked times stay inside. */
+  during?: { from: string; to: string };
+  /** Runs per window, one picked in each equal part of it. Absent means one. */
+  times?: number;
 }
 
 export interface ManualTrigger {
@@ -120,6 +129,7 @@ export interface OnceTrigger {
   type: "once";
   key: string;
   at: string;
+  window?: ScheduleWindow;
 }
 
 export type WebhookAuth = "signature" | "none";
