@@ -1,26 +1,5 @@
-import type { ScheduleWindow } from "./types";
+import type { ScheduleWindow, ScheduleWindowOptions } from "./types";
 
-export interface ScheduleWindowOptions {
-  /**
-   * Runs each occurrence at a time picked inside this window after its scheduled time, so the
-   * time differs from one occurrence to the next. Written as `"<n>m"`, `"<n>h"` or `"<n>d"`, up
-   * to the time between two runs and at most 31 days:
-   * `daily({ key: "post", at: "08:00", within: "1h" })` runs once a day between 08:00 and 09:00.
-   */
-  within?: string;
-  /**
-   * Only picks times inside these hours of the day, in the schedule's time zone. `from` may be
-   * later than `to` to cross midnight. Needs `within`, and is not accepted by `once`:
-   * `weekly({ key: "check-in", day: "monday", at: "00:00", within: "5d", during: { from: "09:00", to: "17:00" } })`
-   * runs once a week at a random time during working hours, Monday to Friday.
-   */
-  during?: { from: string; to: string };
-  /**
-   * Runs this many times in each window, from 1 to 24. The window is split into equal parts and
-   * one time is picked in each, so the runs spread out. Needs `within`.
-   */
-  times?: number;
-}
 
 export const MAX_WINDOW_MINUTES = 31 * 24 * 60;
 export const MAX_WINDOW_TIMES = 24;

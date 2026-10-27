@@ -13,7 +13,7 @@ const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as {
 
 function parseDeclaredNames(declaration: string): string[] {
   const names = new Set<string>();
-  const pattern = /export\s+(?:declare\s+)?(?:interface|type|const|function|class)\s+([A-Za-z0-9_$]+)/g;
+  const pattern = /export\s+(?:declare\s+)?(?:abstract\s+)?(?:interface|type|const|function|class)\s+([A-Za-z0-9_$]+)/g;
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(declaration)) !== null) {
     names.add(match[1]);
@@ -92,6 +92,15 @@ describe("WORKFLOW_SDK_CONTRACT", () => {
       expect(WORKFLOW_SDK_CONTRACT.declarations).toContain(symbol);
       expect(WORKFLOW_SDK_CONTRACT.markdown).toContain(symbol);
     }
+  });
+
+  it("declares every core symbol, not only names it", () => {
+    const integrationSymbols = new Set(WORKFLOW_SDK_CONTRACT.integrationSymbols);
+    const declared = new Set(parseDeclaredNames(WORKFLOW_SDK_CONTRACT.declarations));
+    const undeclared = WORKFLOW_SDK_CONTRACT.symbols.filter(
+      (symbol) => !integrationSymbols.has(symbol) && !declared.has(symbol),
+    );
+    expect(undeclared).toEqual([]);
   });
 
   it("renders every integration symbol into the separately served integrations surface", () => {
