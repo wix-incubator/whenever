@@ -173,7 +173,6 @@ export type WebhookProvider =
   | "supabase"
   | "telegram"
   | "vercel"
-  | "wix-app"
   | "wix-automations";
 
 export interface WebhookTrigger {
