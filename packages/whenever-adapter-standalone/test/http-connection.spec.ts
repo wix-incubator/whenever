@@ -12,6 +12,27 @@ const SLACK: HttpConnection = {
   headers: { Authorization: "Bearer xoxb-connection-token" },
 };
 
+const TELEGRAM_SECRET = "AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw";
+const TELEGRAM_TOKEN = `123456789:${TELEGRAM_SECRET}`;
+const TELEGRAM_SEGMENT = `bot${TELEGRAM_TOKEN}`;
+
+function telegramEcho(fetch: FetchLike) {
+  return createWorkflowIntegrationsFromEnv({
+    fetch,
+    resolveHost: async () => ["93.184.216.34"],
+    httpConnections: {
+      telegram: { baseUrl: "https://api.telegram.org", headers: {}, pathSegment: TELEGRAM_SEGMENT },
+    },
+  });
+}
+
+function echoedPath(): Response {
+  return new Response(
+    JSON.stringify({ ok: false, description: `Not Found: /${TELEGRAM_SEGMENT}/getMe` }),
+    { status: 404, headers: { "Content-Type": "application/json" } },
+  );
+}
+
 function okResponse(): Response {
   return new Response(JSON.stringify({ ok: true }), {
     status: 200,
@@ -216,6 +237,110 @@ describe("HTTP requests through a connection", () => {
 
     expect(fetch.mock.calls[0]?.[1]?.body).toBe("name=Ada");
   });
+
+  it("sends a connection's path credential as the first segment below its base", async () => {
+    const fetch = vi.fn<FetchLike>().mockResolvedValue(okResponse());
+    const telegram = createWorkflowIntegrationsFromEnv({
+      fetch,
+      resolveHost: async () => ["93.184.216.34"],
+      httpConnections: {
+        telegram: { baseUrl: "https://api.telegram.org", headers: {}, pathSegment: TELEGRAM_SEGMENT },
+      },
+    });
+
+    await telegram.http.post({
+      connection: "telegram",
+      url: "https://api.telegram.org/sendMessage",
+      body: { chat_id: 1, text: "Got it" },
+    });
+
+    expect(String(fetch.mock.calls[0]?.[0])).toBe(
+      `https://api.telegram.org/${TELEGRAM_SEGMENT}/sendMessage`,
+    );
+  });
+
+  it("keeps a path credential out of the failure a refused request reports", async () => {
+    const fetch = vi.fn<FetchLike>().mockResolvedValue(echoedPath());
+
+    const failure: unknown = await telegramEcho(fetch)
+      .http.get({ connection: "telegram", url: "https://api.telegram.org/getMe" })
+      .catch((error: unknown) => error);
+
+    expect(failure).toMatchObject({ retryable: false });
+    expect(JSON.stringify(failure)).not.toContain(TELEGRAM_SECRET);
+    expect(String(failure)).not.toContain(TELEGRAM_SECRET);
+  });
+
+  it("keeps a path credential out of the failure however many headers the request sends", async () => {
+    const fetch = vi.fn<FetchLike>().mockResolvedValue(echoedPath());
+    const headers = Object.fromEntries(
+      Array.from({ length: 600 }, (_, index) => [`a-${String(index)}`, `filler-value-${String(index)}`]),
+    );
+
+    const failure: unknown = await telegramEcho(fetch)
+      .http.get({ connection: "telegram", url: "https://api.telegram.org/getMe", headers })
+      .catch((error: unknown) => error);
+
+    expect(String(failure)).toContain("Not Found");
+    expect(String(failure)).not.toContain(TELEGRAM_SECRET);
+  });
+
+  it.each([
+    ["an error field", { ok: false, error: TELEGRAM_SEGMENT }],
+    ["a code field", { ok: false, error_code: TELEGRAM_SEGMENT }],
+    ["the bare token", { ok: false, error: TELEGRAM_TOKEN }],
+    ["the token's secret half", { ok: false, error_code: TELEGRAM_SECRET }],
+    ["a description quoting the bare token", { ok: false, description: `Unauthorized token ${TELEGRAM_TOKEN}` }],
+  ])("keeps a path credential echoed as %s out of the failure's reason", async (_case, body) => {
+    const fetch = vi.fn<FetchLike>().mockResolvedValue(
+      new Response(JSON.stringify(body), { status: 404, headers: { "Content-Type": "application/json" } }),
+    );
+
+    const failure: unknown = await telegramEcho(fetch)
+      .http.get({ connection: "telegram", url: "https://api.telegram.org/getMe" })
+      .catch((error: unknown) => error);
+
+    expect(String(failure)).toContain("404");
+    expect(JSON.stringify(failure)).not.toContain(TELEGRAM_SECRET);
+    expect(String(failure)).not.toContain(TELEGRAM_SECRET);
+  });
+
+  it("leaves a provider's explanation readable when a connection sends a short header", async () => {
+    const fetch = vi.fn<FetchLike>().mockResolvedValue(
+      new Response(JSON.stringify({ ok: false, description: "parameter 1 must be a string" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const versioned = createWorkflowIntegrationsFromEnv({
+      fetch,
+      resolveHost: async () => ["93.184.216.34"],
+      httpConnections: { api: { baseUrl: "https://api.example.com", headers: { "X-Api-Version": "1", "X-Empty": "" } } },
+    });
+
+    const failure: unknown = await versioned.http
+      .get({ connection: "api", url: "https://api.example.com/items" })
+      .catch((error: unknown) => error);
+
+    expect(String(failure)).toContain("parameter 1 must be a string");
+  });
+
+  it.each([["bot1/../x"], [".."], [""], ["bot1?x=1"], ["bot%2f"], [".\t."], ["\n.."], ["bot 1"], ["botä"], ["bot\\1"]])(
+    "refuses to send a path credential %j that is not one segment",
+    async (pathSegment) => {
+      const fetch = vi.fn<FetchLike>().mockResolvedValue(okResponse());
+      const broken = createWorkflowIntegrationsFromEnv({
+        fetch,
+        resolveHost: async () => ["93.184.216.34"],
+        httpConnections: { telegram: { baseUrl: "https://api.telegram.org", headers: {}, pathSegment } },
+      });
+
+      await expect(
+        broken.http.get({ connection: "telegram", url: "https://api.telegram.org/getMe" }),
+      ).rejects.toMatchObject({ code: "INVALID_HTTP_REQUEST" });
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
 
   it("still follows a redirect for a request that names no connection", async () => {
     const fetch = vi

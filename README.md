@@ -98,4 +98,4 @@ const output = await runWorkflow(workflow, {
 });
 ```
 
-The caller supplies AI generation and Postgres execution when the workflow needs them, and `httpConnections` for any `connection` an `http` request names: each holds a `baseUrl` the request must stay under and the credential `headers` to send. Running a workflow this way does not schedule its triggers, register a webhook or publish it; deploy through [Whenever](https://www.whenever.dev/?utm_source=github&utm_medium=readme&utm_campaign=whenever_beta_launch) for that.
+The caller supplies AI generation and Postgres execution when the workflow needs them, and `httpConnections` for any `connection` an `http` request names: each holds a `baseUrl` the request must stay under, the credential `headers` to send and, for a provider that reads its credential from the path, a `pathSegment` sent first below `baseUrl`. Running a workflow this way does not schedule its triggers, register a webhook or publish it; deploy through [Whenever](https://www.whenever.dev/?utm_source=github&utm_medium=readme&utm_campaign=whenever_beta_launch) for that.

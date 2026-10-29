@@ -21,6 +21,8 @@ interface RequestJsonOptions {
    */
   acceptErrorResponse?: (status: number, body: unknown) => boolean;
   timeoutCode?: string;
+  /** Credentials the host added, masked from a reported failure ahead of anything the request supplied. */
+  credentials?: readonly string[];
 }
 
 export interface HttpEnvelope {
@@ -542,11 +544,15 @@ export async function requestEnvelope(
         { code: "AMBIGUOUS_EXTERNAL_WRITE" },
       );
     }
-    const reason = responseErrorMessage(body);
+    const credentials = options.credentials ?? [];
+    const answered = responseErrorMessage(body);
+    const reason = credentials.some((credential) => answered.includes(credential))
+      ? NO_REASON_REPORTED
+      : answered;
     const reported = providerReportedDetail(
       body,
       reason,
-      presentedRequestValues(url, options.init),
+      [...credentials, ...presentedRequestValues(url, options.init)],
     );
     const message = withProviderDetail(
       `API request failed (${statusLabel(response)}): ${reason}`,
