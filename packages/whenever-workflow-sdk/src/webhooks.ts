@@ -146,18 +146,6 @@ export function vercelWebhook(options: WebhookIdentity): WebhookTrigger {
 }
 
 /**
- * A Wix app's webhooks: app events such as `AppInstalled` and site events such as
- * `wix.ecom.v1.order_created`. The host must verify Wix's JWT with the app's configured public key
- * and decode it: `ctx.input` is `{ eventType, instanceId, data,
- * identity }`, already parsed, and `ctx.trigger.eventType` is Wix's event type.
- *
- * @see https://dev.wix.com/docs/build-apps/develop-your-app/api-integrations/events-and-webhooks/about-webhooks
- */
-export function wixAppWebhook(options: WebhookIdentity): WebhookTrigger {
-  return signedWebhook("wix-app", options);
-}
-
-/**
  * A Wix Automations "Send HTTP request" action; `ctx.input` is its JSON body. Wix Automations
  * cannot sign or add headers, so this endpoint is unverified: anyone holding its URL can start a run.
  *

@@ -24,7 +24,6 @@ import {
   supabaseDatabaseWebhook,
   telegramBotWebhook,
   vercelWebhook,
-  wixAppWebhook,
   wixAutomationsWebhook,
 } from "../src/webhooks";
 
@@ -376,7 +375,6 @@ const HELPERS = [
   { helper: "vercelWebhook", build: vercelWebhook, provider: "vercel" },
   { helper: "discordAppInteractionsWebhook", build: discordAppInteractionsWebhook, provider: "discord" },
   { helper: "discordAppEventsWebhook", build: discordAppEventsWebhook, provider: "discord-events" },
-  { helper: "wixAppWebhook", build: wixAppWebhook, provider: "wix-app" },
 ] as const;
 
 describe.each(HELPERS)("$helper", ({ build, provider }) => {
