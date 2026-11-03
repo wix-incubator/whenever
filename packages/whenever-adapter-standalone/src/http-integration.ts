@@ -8,6 +8,7 @@ import {
 import {
   assertAllowedEgressUrl,
   createGuardedFetch,
+  type RefuseDestination,
   type ResolveHost,
 } from "./egress";
 import {
@@ -28,6 +29,7 @@ export interface HttpConnection {
 export interface HttpIntegrationOptions {
   fetch: FetchLike;
   resolveHost?: ResolveHost;
+  refuseDestination?: RefuseDestination;
   timeoutMs?: number;
   signal?: AbortSignal;
   connections?: Readonly<Record<string, HttpConnection>>;
@@ -287,12 +289,14 @@ function invalidHttpRequest(message: string): NonRetryableError {
 export function createHttpIntegrationFromEnv({
   fetch: rawFetch,
   resolveHost,
+  refuseDestination,
   timeoutMs,
   signal,
   connections,
 }: HttpIntegrationOptions): HttpIntegration {
   const guard = {
     ...(resolveHost !== undefined ? { resolveHost } : {}),
+    ...(refuseDestination !== undefined ? { refuseDestination } : {}),
     ...(timeoutMs !== undefined ? { timeoutMs } : {}),
     ...(signal !== undefined ? { signal } : {}),
   };

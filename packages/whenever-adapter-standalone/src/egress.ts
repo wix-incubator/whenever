@@ -176,6 +176,16 @@ const CROSS_ORIGIN_SAFE_HEADERS = new Set([
 
 export type ResolveHost = (hostname: string) => Promise<string[]>;
 
+export interface EgressDestination {
+  readonly hostname: string;
+  readonly addresses: readonly string[];
+}
+
+/** Returns why the destination is refused, or `undefined` to allow it. */
+export type RefuseDestination = (
+  destination: EgressDestination,
+) => Promise<string | undefined>;
+
 function stripCredentials(headers: Headers): Headers {
   const retained = new Headers();
   headers.forEach((value, name) => {
@@ -186,8 +196,12 @@ function stripCredentials(headers: Headers): Headers {
   return retained;
 }
 
+function bareHostname(hostname: string): string {
+  return hostname.startsWith("[") ? hostname.slice(1, -1) : hostname;
+}
+
 function isIpLiteral(hostname: string): boolean {
-  const bare = hostname.startsWith("[") ? hostname.slice(1, -1) : hostname;
+  const bare = bareHostname(hostname);
   return bare.includes(":") || parseIpv4(bare) !== undefined;
 }
 
@@ -232,6 +246,28 @@ async function assertResolvedAddressesAllowed(
     assertAllowedEgressUrl(probe);
   }
   return addresses;
+}
+
+async function assertDestinationAllowed(
+  url: URL,
+  resolved: readonly string[] | undefined,
+  refuseDestination: RefuseDestination | undefined,
+  deadline: AbortSignal,
+): Promise<void> {
+  if (refuseDestination === undefined) return;
+  const hostname = bareHostname(url.hostname.toLowerCase());
+  const addresses = isIpLiteral(hostname) ? [hostname] : (resolved ?? []);
+  let reason: string | undefined;
+  try {
+    reason = await Promise.race([
+      refuseDestination({ hostname, addresses }),
+      abortedBefore(deadline),
+    ]);
+  } catch (caught) {
+    if (deadline.aborted) throw caught;
+    throw blocked(url, "the destination could not be checked");
+  }
+  if (reason !== undefined) throw blocked(url, reason);
 }
 
 interface PinnedLookupOptions {
@@ -310,6 +346,9 @@ function withPinnedAddresses(
 export interface GuardedFetchOptions {
   timeoutMs?: number;
   resolveHost?: ResolveHost;
+  /** Consulted on every hop once the built-in checks pass. Its `addresses` are an IP literal host
+   * itself, or what `resolveHost` answered; a name gets none when no `resolveHost` is set. */
+  refuseDestination?: RefuseDestination;
   /** Shared across every request this fetch makes: the per-request timeout restarts
    * on each call, so a two-hop operation would otherwise get the window twice. */
   signal?: AbortSignal;
@@ -371,6 +410,12 @@ export function createGuardedFetch(
       const pinned = await assertResolvedAddressesAllowed(
         url,
         options.resolveHost,
+        deadline,
+      );
+      await assertDestinationAllowed(
+        url,
+        pinned,
+        options.refuseDestination,
         deadline,
       );
 

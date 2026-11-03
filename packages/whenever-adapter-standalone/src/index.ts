@@ -29,7 +29,13 @@ export {
   unavailableAiGenerateText,
   unavailableAiGenerateVideo,
 } from "./ai-integration";
-export type { GuardedFetchOptions, PinnedLookup, ResolveHost } from "./egress";
+export type {
+  EgressDestination,
+  GuardedFetchOptions,
+  PinnedLookup,
+  RefuseDestination,
+  ResolveHost,
+} from "./egress";
 export {
   assertAllowedEgressUrl,
   createGuardedFetch,
