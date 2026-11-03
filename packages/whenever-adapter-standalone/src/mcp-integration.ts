@@ -8,6 +8,7 @@ import {
 import {
   assertAllowedEgressUrl,
   createGuardedFetch,
+  type RefuseDestination,
   type ResolveHost,
 } from "./egress";
 import {
@@ -52,6 +53,7 @@ export interface McpIntegrationOptions {
    */
   probeFetch?: FetchLike;
   resolveHost?: ResolveHost;
+  refuseDestination?: RefuseDestination;
   timeoutMs?: number;
   signal?: AbortSignal;
 }
@@ -595,11 +597,13 @@ export function createMcpIntegrationFromEnv({
   fetch: rawFetch,
   probeFetch: rawProbeFetch,
   resolveHost,
+  refuseDestination,
   timeoutMs,
   signal,
 }: McpIntegrationOptions): McpIntegration {
   const guard = {
     ...(resolveHost !== undefined ? { resolveHost } : {}),
+    ...(refuseDestination !== undefined ? { refuseDestination } : {}),
     ...(timeoutMs !== undefined ? { timeoutMs } : {}),
     ...(signal !== undefined ? { signal } : {}),
   };
@@ -788,11 +792,13 @@ function describedTools(envelope: JsonRpcEnvelope, presented: readonly string[])
 export function createMcpDiscoveryFromEnv({
   fetch: rawFetch,
   resolveHost,
+  refuseDestination,
   timeoutMs,
   signal,
 }: McpIntegrationOptions): ListMcpTools {
   const fetch = createGuardedFetch(rawFetch, {
     ...(resolveHost !== undefined ? { resolveHost } : {}),
+    ...(refuseDestination !== undefined ? { refuseDestination } : {}),
     ...(timeoutMs !== undefined ? { timeoutMs } : {}),
     ...(signal !== undefined ? { signal } : {}),
   });

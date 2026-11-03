@@ -9,7 +9,7 @@ import {
   unavailableAiGenerateText,
   unavailableAiGenerateVideo,
 } from "./ai-integration";
-import { type ResolveHost } from "./egress";
+import { type RefuseDestination, type ResolveHost } from "./egress";
 import type { FetchLike } from "./http";
 import {
   createHttpIntegrationFromEnv,
@@ -27,6 +27,7 @@ export interface CreateWorkflowIntegrationsFromEnvOptions {
   /** See McpIntegrationOptions.probeFetch. Defaults to `fetch`. */
   probeFetch?: FetchLike;
   resolveHost?: ResolveHost;
+  refuseDestination?: RefuseDestination;
   generateImage?: AiGenerateImagePort;
   generateText?: AiGenerateTextPort;
   generateVideo?: AiGenerateVideoPort;
@@ -40,7 +41,12 @@ export function createWorkflowIntegrationsFromEnv(
   const fetchImplementation: FetchLike =
     options.fetch ?? ((input, init) => globalThis.fetch(input, init));
   const resolveHost = options.resolveHost ?? defaultResolveHost();
-  const egressOptions = resolveHost === undefined ? {} : { resolveHost };
+  const egressOptions = {
+    ...(resolveHost === undefined ? {} : { resolveHost }),
+    ...(options.refuseDestination === undefined
+      ? {}
+      : { refuseDestination: options.refuseDestination }),
+  };
 
   return {
     ai: createAiIntegration({
