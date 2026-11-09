@@ -133,6 +133,8 @@ ${declarations}
 
 \`ai.generateText\` takes an optional \`model\`, one of ${AI_TEXT_MODELS.map((model) => `\`"${model}"\``).join(", ")} (\`AI_TEXT_MODELS\`), and an optional \`reasoningEffort\` of \`"low"\`, \`"medium"\` or \`"high"\`. Omit either for the host's default. ${AI_TEXT_MODELS_WITHOUT_FORCED_TOOL_CHOICE.map((model) => `\`"${model}"\``).join(" and ")} cannot be forced to call a tool (\`AI_TEXT_MODELS_WITHOUT_FORCED_TOOL_CHOICE\`): with them, a \`toolChoice\` other than \`"auto"\` is refused.
 
+A one-shot \`prompt\` or a \`user\` message's \`content\` may be a list of text and image parts, read in order; assistant and tool messages stay text. The host may refuse an image its model cannot read.
+
 Every other provider operation comes from a binding supplied by the host. Its input and result types are declared as a \`WorkflowIntegrations\` augmentation, which is what makes \`ctx.integrations.<toolkit>.<operation>\` compile. An operation that has not been bound in this workspace neither typechecks nor runs, so bind it before writing the call — and take the call and the types from what the bind returned rather than restating them.
 
 ## Canonical example

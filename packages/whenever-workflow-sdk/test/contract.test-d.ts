@@ -199,6 +199,28 @@ test("a conversation without tools can only stop with text", () => {
   ).toEqualTypeOf<Promise<AiConversationTextResult>>();
 });
 
+test("a prompt and a user message take text and image parts", () => {
+  const ai = {} as WorkflowContext["integrations"]["ai"];
+  const screenshot = {
+    type: "image",
+    url: "https://example.com/screenshot.png",
+    mediaType: "image/png",
+  } as const;
+
+  expectTypeOf(
+    ai.generateText({ prompt: [{ type: "text", text: "Describe this." }, screenshot] }),
+  ).toEqualTypeOf<Promise<AiGenerateTextResult>>();
+  expectTypeOf(
+    ai.generateText({ messages: [{ role: "user", content: [screenshot] }] }),
+  ).toEqualTypeOf<Promise<AiConversationTextResult>>();
+  // @ts-expect-error an image names its format
+  void ai.generateText({ prompt: [{ type: "image", url: screenshot.url }] });
+  // @ts-expect-error only the listed image formats are accepted
+  void ai.generateText({ prompt: [{ ...screenshot, mediaType: "image/tiff" }] });
+  // @ts-expect-error an assistant message stays text
+  void ai.generateText({ messages: [{ role: "assistant", content: [screenshot] }] });
+});
+
 test("a conversation with tools names its tool calls by the tool keys", async () => {
   const ctx = {} as WorkflowContext;
   const messages: AiMessage[] = [{ role: "user", content: "Close ABC-1." }];

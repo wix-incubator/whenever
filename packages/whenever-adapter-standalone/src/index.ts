@@ -16,10 +16,13 @@ export type {
 export {
   AI_CONVERSATION_LIMIT_CHARACTERS,
   AI_CONVERSATION_MESSAGE_LIMIT,
+  AI_IMAGE_LIMIT,
+  AI_IMAGE_URL_LIMIT_CHARACTERS,
   AI_PROMPT_LIMIT_CHARACTERS,
   AI_REASONING_EFFORTS,
   AI_TOOL_LIMIT,
   aiConversationTurn,
+  aiUserContentParts,
   createAiIntegration,
   isAiConversationRequest,
   prepareAiGenerateImageInput,
