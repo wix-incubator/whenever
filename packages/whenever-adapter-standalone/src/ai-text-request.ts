@@ -1,6 +1,7 @@
 import {
   AI_TEXT_MODELS,
   AI_TEXT_MODELS_WITHOUT_FORCED_TOOL_CHOICE,
+  AI_USER_IMAGE_MEDIA_TYPES,
   type AiGenerationSettings,
   type AiMessage,
   type AiReasoningEffort,
@@ -9,20 +10,28 @@ import {
   type AiToolCall,
   type AiToolChoice,
   type AiTools,
+  type AiUserContent,
+  type AiUserContentPart,
+  type AiUserImageMediaType,
   NonRetryableError,
 } from "@wix/whenever-workflow-sdk";
+
+import { assertAllowedEgressUrl } from "./egress";
 
 export const AI_PROMPT_LIMIT_CHARACTERS = 100_000;
 // A loop resends every tool result it has gathered, so a conversation outgrows a single prompt.
 export const AI_CONVERSATION_LIMIT_CHARACTERS = 1_000_000;
 export const AI_CONVERSATION_MESSAGE_LIMIT = 200;
 export const AI_TOOL_LIMIT = 64;
+// The images of a conversation are resent on every turn, so the bound covers the whole request.
+export const AI_IMAGE_LIMIT = 20;
+export const AI_IMAGE_URL_LIMIT_CHARACTERS = 2_048;
 
 const TOOL_NAME = /^[A-Za-z0-9_-]{1,64}$/u;
 export const AI_REASONING_EFFORTS: readonly AiReasoningEffort[] = ["low", "medium", "high"];
 
 export interface AiPromptRequest extends Readonly<AiGenerationSettings> {
-  readonly prompt: string;
+  readonly prompt: AiUserContent;
   readonly system?: string;
 }
 
@@ -96,6 +105,77 @@ function text(value: unknown, name: string): string {
   return value;
 }
 
+/** The parts of a prompt or user message; a string is one text part. */
+export function aiUserContentParts(content: AiUserContent): readonly AiUserContentPart[] {
+  return typeof content === "string" ? [{ type: "text", text: content }] : content;
+}
+
+function contentCharacters(content: AiUserContent): number {
+  return aiUserContentParts(content).reduce(
+    (total, part) => total + (part.type === "text" ? part.text.length : part.url.length),
+    0,
+  );
+}
+
+interface ImageCount {
+  images: number;
+}
+
+// The checks hold for the parsed URL, so the port is handed its serialization rather than the
+// raw string another parser could read differently.
+function imageUrl(value: unknown, name: string): string {
+  const limit = `${name} must be a URL of at most ${String(AI_IMAGE_URL_LIMIT_CHARACTERS)} characters`;
+  if (typeof value !== "string" || value.length > AI_IMAGE_URL_LIMIT_CHARACTERS) throw invalid(limit);
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw invalid(`${name} must be an https: URL`);
+  }
+  if (url.protocol !== "https:") throw invalid(`${name} must be an https: URL`);
+  if (url.username !== "" || url.password !== "") {
+    throw invalid(`${name} must not carry credentials`);
+  }
+  try {
+    assertAllowedEgressUrl(url);
+  } catch {
+    throw invalid(`${name} names a private or internal host`);
+  }
+  if (url.href.length > AI_IMAGE_URL_LIMIT_CHARACTERS) throw invalid(limit);
+  return url.href;
+}
+
+function prepareContentPart(value: unknown, where: string, count: ImageCount): AiUserContentPart {
+  if (!isPlainRecord(value)) throw invalid(`${where} must be an object`);
+  const part = definedEntries(value);
+  if (part.type === "text") {
+    requireOnlyKeys(part, ["type", "text"], where);
+    return { type: "text", text: nonEmptyText(part.text, `${where}.text`) };
+  }
+  if (part.type === "image") {
+    requireOnlyKeys(part, ["type", "url", "mediaType"], where);
+    count.images += 1;
+    if (count.images > AI_IMAGE_LIMIT) {
+      throw invalid(`at most ${String(AI_IMAGE_LIMIT)} images can be sent in one call`);
+    }
+    const url = imageUrl(part.url, `${where}.url`);
+    const mediaType = part.mediaType;
+    if (!AI_USER_IMAGE_MEDIA_TYPES.includes(mediaType as AiUserImageMediaType)) {
+      throw invalid(`${where}.mediaType must be one of ${AI_USER_IMAGE_MEDIA_TYPES.map((value) => JSON.stringify(value)).join(", ")}`);
+    }
+    return { type: "image", url, mediaType: mediaType as AiUserImageMediaType };
+  }
+  throw invalid(`${where}.type must be "text" or "image"`);
+}
+
+function prepareUserContent(value: unknown, name: string, count: ImageCount): AiUserContent {
+  if (!Array.isArray(value)) return nonEmptyText(value, name);
+  if (value.length === 0) throw invalid(`${name} must be a non-empty string or list of parts`);
+  return value.map((part: unknown, index) =>
+    prepareContentPart(part, `${name}[${String(index)}]`, count),
+  );
+}
+
 function prepareSettings(fields: Record<string, unknown>): AiGenerationSettings {
   const model = fields.model;
   if (model !== undefined && !AI_TEXT_MODELS.includes(model as AiTextModel)) {
@@ -116,10 +196,10 @@ export function prepareAiTextRequest(input: unknown): AiGenerateTextRequest {
   const fields = definedEntries(input);
   if ("messages" in fields) return prepareConversation(fields);
   requireOnlyKeys(fields, ["prompt", "system", "model", "reasoningEffort"], "a prompt call");
-  const prompt = nonEmptyText(fields.prompt, "prompt");
+  const prompt = prepareUserContent(fields.prompt, "prompt", { images: 0 });
   const system =
     fields.system === undefined ? undefined : nonEmptyText(fields.system, "system");
-  if (prompt.length + (system?.length ?? 0) > AI_PROMPT_LIMIT_CHARACTERS) {
+  if (contentCharacters(prompt) + (system?.length ?? 0) > AI_PROMPT_LIMIT_CHARACTERS) {
     throw invalid(`prompt exceeds ${String(AI_PROMPT_LIMIT_CHARACTERS)} characters`);
   }
   return {
@@ -146,7 +226,11 @@ function prepareConversation(fields: Record<string, unknown>): AiConversationReq
 
   const characters =
     (system?.length ?? 0) +
-    messages.reduce((total, message) => total + message.content.length, 0) +
+    messages.reduce(
+      (total, message) =>
+        total + (message.role === "user" ? contentCharacters(message.content) : message.content.length),
+      0,
+    ) +
     Object.values(tools ?? {}).reduce(
       (total, tool) => total + tool.description.length + JSON.stringify(tool.parameters).length,
       0,
@@ -224,6 +308,7 @@ function prepareMessages(value: unknown): AiMessage[] {
     throw invalid(`messages holds more than ${String(AI_CONVERSATION_MESSAGE_LIMIT)} entries`);
   }
   const seenCallIds = new Set<string>();
+  const count: ImageCount = { images: 0 };
   let unanswered = new Set<string>();
   const messages = value.map((entry: unknown, index): AiMessage => {
     const where = `messages[${String(index)}]`;
@@ -242,7 +327,7 @@ function prepareMessages(value: unknown): AiMessage[] {
     }
     if (message.role === "user") {
       requireOnlyKeys(message, ["role", "content"], where);
-      return { role: "user", content: nonEmptyText(message.content, `${where}.content`) };
+      return { role: "user", content: prepareUserContent(message.content, `${where}.content`, count) };
     }
     if (message.role === "assistant") {
       requireOnlyKeys(message, ["role", "content", "toolCalls", "providerState"], where);

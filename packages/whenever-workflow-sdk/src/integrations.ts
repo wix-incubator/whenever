@@ -33,9 +33,39 @@ export interface AiGenerationSettings {
   reasoningEffort?: AiReasoningEffort;
 }
 
+/** The image formats a user message or prompt can carry. */
+export const AI_USER_IMAGE_MEDIA_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+] as const;
+
+export type AiUserImageMediaType = (typeof AI_USER_IMAGE_MEDIA_TYPES)[number];
+
+export interface AiUserTextPart {
+  readonly type: "text";
+  readonly text: string;
+}
+
+/**
+ * An image the model reads from an `https:` URL it can fetch without credentials. `mediaType`
+ * names the image's format; a host may refuse a format the chosen model cannot read.
+ */
+export interface AiUserImagePart {
+  readonly type: "image";
+  readonly url: string;
+  readonly mediaType: AiUserImageMediaType;
+}
+
+export type AiUserContentPart = AiUserTextPart | AiUserImagePart;
+
+/** Plain text, or text and images in the order the model reads them. */
+export type AiUserContent = string | readonly AiUserContentPart[];
+
 /** One-shot generation: an instruction and its content in `prompt`, optionally steered by `system`. */
 export interface AiGenerateTextInput extends AiGenerationSettings {
-  prompt: string;
+  prompt: AiUserContent;
   system?: string;
   messages?: never;
   tools?: never;
@@ -70,7 +100,7 @@ export interface AiToolCall<TName extends string = string> {
 
 export interface AiUserMessage {
   readonly role: "user";
-  readonly content: string;
+  readonly content: AiUserContent;
 }
 
 export interface AiAssistantMessage<TName extends string = string> {
