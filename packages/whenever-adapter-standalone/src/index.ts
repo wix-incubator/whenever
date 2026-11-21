@@ -64,9 +64,9 @@ export {
   createMcpIntegrationFromEnv,
   MCP_ARGUMENTS_REFUSED,
   MCP_INPUT_REJECTED,
-  MCP_PROTOCOL_VERSION,
   MCP_TOOL_LIST_UNAUTHORIZED,
 } from "./mcp-integration";
+export { MCP_PROTOCOL_VERSION } from "./mcp-transport";
 export type {
   PostgresIntegrationOptions,
   PostgresQueryPort,
