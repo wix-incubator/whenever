@@ -275,6 +275,14 @@ describe("events/poll", () => {
     expect({ code: error.code, rpcCode: error.rpcCode }).toEqual({ code: "MCP_EVENTS_RPC_ERROR", rpcCode: -32023 });
   });
 
+  it("reads the draft numbering ChatGPT-dialect servers answer with as the SEP's code", async () => {
+    const fetch = server({ era: "modern", events: () => ({ error: { code: -32012, message: "Forbidden" } }) });
+
+    const error = await caught(client(fetch).poll(TARGET, { name: "item.created", arguments: {}, cursor: null }));
+
+    expect(error.rpcCode).toBe(-32024);
+  });
+
   it("refuses an occurrence without an eventId as an invalid response", async () => {
     const fetch = server({ era: "modern", events: () => ({ result: { ...EMPTY_POLL.result, events: [{ name: "item.created", timestamp: "t", data: {} }] } }) });
 
@@ -328,6 +336,14 @@ describe("events/subscribe", () => {
     const error = await caught(client(fetch).subscribe(TARGET, request));
 
     expect({ rpcCode: error.rpcCode, reason: error.reason }).toEqual({ rpcCode: -32027, reason });
+  });
+
+  it("carries the callback failure reason under the draft's CallbackEndpointError code", async () => {
+    const fetch = server({ era: "modern", events: () => ({ error: { code: -32015, message: "CallbackEndpointError", data: { reason: "challenge_failed" } } }) });
+
+    const error = await caught(client(fetch).subscribe(TARGET, request));
+
+    expect({ rpcCode: error.rpcCode, reason: error.reason }).toEqual({ rpcCode: -32027, reason: "challenge_failed" });
   });
 });
 

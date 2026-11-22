@@ -135,6 +135,14 @@ const MAX_EVENT_LIST_PAGES = 20;
 const MAX_EVENT_ID_LENGTH = 200;
 const HEADER_MISMATCH = -32020;
 const CALLBACK_ENDPOINT_ERROR = -32027;
+/** ChatGPT's dialect, and servers built for it, still answer with the draft's numbering for the SEP's codes. */
+const DRAFT_ERROR_CODES: ReadonlyMap<number, number> = new Map([
+  [-32011, -32023],
+  [-32012, -32024],
+  [-32013, -32025],
+  [-32014, -32026],
+  [-32015, -32027],
+]);
 const CALLBACK_REASON = /^[a-z\d_]{1,40}$/u;
 const HEADER_TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/u;
 const PLAIN_HEADER_VALUE = /^[\x21-\x7e](?:[\x20-\x7e]*[\x21-\x7e])?$/u;
@@ -446,7 +454,8 @@ export function createMcpEventsClient({ fetch: rawFetch, resolveHost, timeoutMs,
     if (UNAUTHORIZED_STATUSES.has(envelope.status)) throw unauthorized(envelope.status);
     const frame = responseFrame(envelope.body, id);
     if (frame.error !== undefined) {
-      const rpcCode = typeof frame.error.code === "number" ? frame.error.code : undefined;
+      const rawCode = typeof frame.error.code === "number" ? frame.error.code : undefined;
+      const rpcCode = rawCode === undefined ? undefined : (DRAFT_ERROR_CODES.get(rawCode) ?? rawCode);
       const data = frame.error.data;
       const reason = rpcCode === CALLBACK_ENDPOINT_ERROR && isPlainRecord(data) && typeof data.reason === "string" &&
         CALLBACK_REASON.test(data.reason)
