@@ -279,6 +279,12 @@ export interface HttpIntegration {
 
 export interface McpToolCallInput {
   url: string;
+  /**
+   * Names a connection the host holds. The host adds that connection's credentials and refuses a
+   * `url` that is not that connection's server, so the workflow passes no `Authorization` header
+   * of its own.
+   */
+  connection?: string;
   toolName: string;
   toolProps?: Record<string, unknown>;
   headers?: Record<string, string>;

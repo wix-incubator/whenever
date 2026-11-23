@@ -57,9 +57,57 @@ export interface McpIntegrationOptions {
   resolveHost?: ResolveHost;
   timeoutMs?: number;
   signal?: AbortSignal;
+  connections?: Readonly<Record<string, McpConnection>>;
+}
+
+export interface McpConnection {
+  /** The server's canonical resource URI (RFC 8707); a call must name this same server. */
+  readonly resource: string;
+  readonly headers: Readonly<Record<string, string>>;
 }
 
 export const MCP_INPUT_REJECTED = "MCP_INPUT_REJECTED";
+
+export const MCP_CONNECTION_REFUSED = "MCP_CONNECTION_REFUSED";
+
+function connectionRefused(message: string): NonRetryableError {
+  return new NonRetryableError(`MCP connection refused: ${message}.`, {
+    code: MCP_CONNECTION_REFUSED,
+  });
+}
+
+/** Returns the input carrying the named connection's headers, or the input unchanged without one. */
+function connected(
+  connections: McpIntegrationOptions["connections"],
+  input: McpToolCallInput,
+  url: URL,
+): McpToolCallInput {
+  const name = input.connection;
+  if (name === undefined) return input;
+  const connection =
+    connections !== undefined && Object.prototype.hasOwnProperty.call(connections, name)
+      ? connections[name]
+      : undefined;
+  if (connection === undefined) {
+    throw connectionRefused(`connection "${name}" is not available here`);
+  }
+  if (!sameResource(connection.resource, url)) {
+    throw connectionRefused(`connection "${name}" sends only to ${connection.resource}`);
+  }
+  if (Object.keys(input.headers ?? {}).some((header) => header.toLowerCase() === "authorization")) {
+    throw connectionRefused(`connection "${name}" sets the authorization header itself`);
+  }
+  return { ...input, headers: { ...input.headers, ...connection.headers } };
+}
+
+// RFC 8707 resource identity: query and fragment never name a different server, nor does one
+// trailing slash; the path stays case-sensitive.
+function sameResource(resource: string, url: URL): boolean {
+  const canonical = (target: URL): string =>
+    `${target.protocol}//${target.host}${target.pathname.replace(/\/$/u, "")}`;
+  const expected = new URL(resource);
+  return url.protocol === "https:" && canonical(expected) === canonical(url);
+}
 
 /**
  * A JSON-RPC error frame refusing the arguments, which a server sends instead of a result. The
@@ -92,6 +140,12 @@ function validated(input: unknown): McpToolCallInput {
   }
   if (input.toolProps !== undefined && !isPlainRecord(input.toolProps)) {
     throw invalidRequest("toolProps must be an object");
+  }
+  if (
+    input.connection !== undefined &&
+    (typeof input.connection !== "string" || input.connection.trim() === "")
+  ) {
+    throw invalidRequest("connection must be a non-empty string");
   }
   if (input.headers !== undefined) {
     if (!isPlainRecord(input.headers)) {
@@ -338,21 +392,35 @@ export function createMcpIntegrationFromEnv({
   resolveHost,
   timeoutMs,
   signal,
+  connections,
 }: McpIntegrationOptions): McpIntegration {
   const guard = {
     ...(resolveHost !== undefined ? { resolveHost } : {}),
     ...(timeoutMs !== undefined ? { timeoutMs } : {}),
     ...(signal !== undefined ? { signal } : {}),
   };
-  const fetch = createGuardedFetch(rawFetch, guard);
-  const probeFetch =
-    rawProbeFetch === undefined ? fetch : createGuardedFetch(rawProbeFetch, guard);
+  const guardedFetches = (redirects: boolean) => {
+    const options = { ...guard, followRedirects: redirects };
+    const fetch = createGuardedFetch(rawFetch, options);
+    return {
+      fetch,
+      probeFetch:
+        rawProbeFetch === undefined ? fetch : createGuardedFetch(rawProbeFetch, options),
+    };
+  };
+  const unconnected = guardedFetches(true);
+  // A redirect must not carry the connection's credentials to another server.
+  const withConnection = guardedFetches(false);
 
   const call = async (
     failureMode: "safe" | "write",
     rawInput: unknown,
   ): Promise<McpToolResult> => {
-    const { input, url } = prepareMcpToolCallInput(rawInput);
+    const prepared = prepareMcpToolCallInput(rawInput);
+    const { url } = prepared;
+    const input = connected(connections, prepared.input, url);
+    const { fetch, probeFetch } =
+      input === prepared.input ? unconnected : withConnection;
     const dispatch = async (
       lifecycle: McpLifecycle,
       mayReopenSession: boolean,
