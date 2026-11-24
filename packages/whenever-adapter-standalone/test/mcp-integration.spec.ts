@@ -3215,6 +3215,8 @@ describe("MCP integration with a host-held connection", () => {
 
   it.each([
     ["a different path", "https://mcp.example.com/other"],
+    ["a path that only starts with the resource path", "https://mcp.example.com/mcpx"],
+    ["a parent path", "https://mcp.example.com/"],
     ["a different path case", "https://mcp.example.com/MCP"],
     ["a different host", "https://evil.example.com/mcp"],
     ["a different port", "https://mcp.example.com:8443/mcp"],
@@ -3223,6 +3225,37 @@ describe("MCP integration with a host-held connection", () => {
     await expect(
       connected(fetch).read({ url, toolName: "search", connection: "crm" }),
     ).rejects.toMatchObject({ code: MCP_CONNECTION_REFUSED, retryable: false });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  // RFC 9728: a root protected resource document may name the origin or a parent path.
+  it.each([
+    ["the origin", "https://mcp.example.com", "https://mcp.example.com/mcp"],
+    ["a parent path", "https://mcp.example.com/a", "https://mcp.example.com/a/b"],
+  ])("sends a connection for %s to a URL under it", async (_label, resource, url) => {
+    const fetch = ok();
+    await createMcpIntegrationFromEnv({
+      fetch,
+      resolveHost: async () => ["93.184.216.34"],
+      connections: { crm: { ...connections.crm, resource } },
+    }).read({ url, toolName: "search", connection: "crm" });
+    expect(new Headers(requestTo(fetch, "tools/call")?.headers).get("authorization")).toBe(
+      "Bearer conn-secret-token",
+    );
+  });
+
+  it.each([
+    ["another host", "https://mcp.example.com", "https://evil.example.com/mcp"],
+    ["a sibling path", "https://mcp.example.com/a", "https://mcp.example.com/ab"],
+  ])("refuses a connection for %s", async (_label, resource, url) => {
+    const fetch = ok();
+    await expect(
+      createMcpIntegrationFromEnv({
+        fetch,
+        resolveHost: async () => ["93.184.216.34"],
+        connections: { crm: { ...connections.crm, resource } },
+      }).read({ url, toolName: "search", connection: "crm" }),
+    ).rejects.toMatchObject({ code: MCP_CONNECTION_REFUSED });
     expect(fetch).not.toHaveBeenCalled();
   });
 

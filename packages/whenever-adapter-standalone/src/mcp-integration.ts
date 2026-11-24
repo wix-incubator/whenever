@@ -61,7 +61,10 @@ export interface McpIntegrationOptions {
 }
 
 export interface McpConnection {
-  /** The server's canonical resource URI (RFC 8707); a call must name this same server. */
+  /**
+   * The resource URI the token was issued for (RFC 8707); a call must name it or a URL beneath it on
+   * the same scheme, host and port, since RFC 9728 lets a root document name the origin.
+   */
   readonly resource: string;
   readonly headers: Readonly<Record<string, string>>;
 }
@@ -91,7 +94,7 @@ function connected(
   if (connection === undefined) {
     throw connectionRefused(`connection "${name}" is not available here`);
   }
-  if (!sameResource(connection.resource, url)) {
+  if (!resourceCovers(connection.resource, url)) {
     throw connectionRefused(`connection "${name}" sends only to ${connection.resource}`);
   }
   if (Object.keys(input.headers ?? {}).some((header) => header.toLowerCase() === "authorization")) {
@@ -100,13 +103,15 @@ function connected(
   return { ...input, headers: { ...input.headers, ...connection.headers } };
 }
 
-// RFC 8707 resource identity: query and fragment never name a different server, nor does one
-// trailing slash; the path stays case-sensitive.
-function sameResource(resource: string, url: URL): boolean {
-  const canonical = (target: URL): string =>
-    `${target.protocol}//${target.host}${target.pathname.replace(/\/$/u, "")}`;
-  const expected = new URL(resource);
-  return url.protocol === "https:" && canonical(expected) === canonical(url);
+// RFC 8707 resource identity, where query and fragment never name a different server, nor does one
+// trailing slash; the path stays case-sensitive. A resource covers the whole segments beneath it:
+// `/a` covers `/a/b`, never `/ab`.
+function resourceCovers(resource: string, url: URL): boolean {
+  const granted = new URL(resource);
+  if (url.protocol !== "https:" || granted.protocol !== url.protocol || granted.host !== url.host) return false;
+  const prefix = granted.pathname.replace(/\/$/u, "");
+  const path = url.pathname.replace(/\/$/u, "");
+  return prefix === "" || path === prefix || path.startsWith(`${prefix}/`);
 }
 
 /**
