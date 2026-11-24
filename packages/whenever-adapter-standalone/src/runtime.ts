@@ -15,7 +15,10 @@ import {
   createHttpIntegrationFromEnv,
   type HttpConnection,
 } from "./http-integration";
-import { createMcpIntegrationFromEnv } from "./mcp-integration";
+import {
+  createMcpIntegrationFromEnv,
+  type McpConnection,
+} from "./mcp-integration";
 import {
   createPostgresIntegration,
   type PostgresQueryPort,
@@ -32,6 +35,7 @@ export interface CreateWorkflowIntegrationsFromEnvOptions {
   generateVideo?: AiGenerateVideoPort;
   queryPostgres?: PostgresQueryPort;
   httpConnections?: Readonly<Record<string, HttpConnection>>;
+  mcpConnections?: Readonly<Record<string, McpConnection>>;
 }
 
 export function createWorkflowIntegrationsFromEnv(
@@ -61,6 +65,9 @@ export function createWorkflowIntegrationsFromEnv(
         ? {}
         : { probeFetch: options.probeFetch }),
       ...egressOptions,
+      ...(options.mcpConnections === undefined
+        ? {}
+        : { connections: options.mcpConnections }),
     }),
     postgres: createPostgresIntegration({
       query: options.queryPostgres ?? unavailablePostgresQuery(),

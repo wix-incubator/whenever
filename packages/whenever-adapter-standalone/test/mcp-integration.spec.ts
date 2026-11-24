@@ -8,6 +8,7 @@ import {
   type FetchLike,
   HTTP_REQUEST_BODY_LIMIT_BYTES,
   MCP_ARGUMENTS_REFUSED,
+  MCP_CONNECTION_REFUSED,
   MCP_INPUT_REJECTED,
   MCP_PROTOCOL_VERSION,
   MCP_TOOL_LIST_UNAUTHORIZED,
@@ -3168,5 +3169,137 @@ describe("the headers this client owns whatever an author sent", () => {
     expect(new Headers(requestTo(fetch, "tools/call")?.headers).get(name)).toBe(
       expected,
     );
+  });
+});
+
+describe("MCP integration with a host-held connection", () => {
+  const connections = {
+    crm: {
+      resource: "https://mcp.example.com/mcp",
+      headers: { Authorization: "Bearer conn-secret-token" },
+    },
+  };
+  const connected = (fetch: FetchLike) =>
+    createMcpIntegrationFromEnv({
+      fetch,
+      resolveHost: async () => ["93.184.216.34"],
+      connections,
+    });
+  const ok = () =>
+    answersWith((id) =>
+      toolResult({ structuredContent: { ok: true }, content: [] }, id),
+    );
+
+  it("adds the connection's credentials to the handshake and the call", async () => {
+    const fetch = ok();
+    await connected(fetch).read({
+      url: "https://mcp.example.com/mcp",
+      toolName: "search",
+      connection: "crm",
+    });
+    for (const method of ["initialize", "tools/call"]) {
+      expect(new Headers(requestTo(fetch, method)?.headers).get("authorization")).toBe(
+        "Bearer conn-secret-token",
+      );
+    }
+  });
+
+  it.each([
+    "https://MCP.example.com:443/mcp/",
+    "https://mcp.example.com/mcp?tenant=1#x",
+  ])("accepts the same resource written as %s", async (url) => {
+    const fetch = ok();
+    await connected(fetch).read({ url, toolName: "search", connection: "crm" });
+    expect(requestTo(fetch, "tools/call")).toBeDefined();
+  });
+
+  it.each([
+    ["a different path", "https://mcp.example.com/other"],
+    ["a path that only starts with the resource path", "https://mcp.example.com/mcpx"],
+    ["a parent path", "https://mcp.example.com/"],
+    ["a different path case", "https://mcp.example.com/MCP"],
+    ["a different host", "https://evil.example.com/mcp"],
+    ["a different port", "https://mcp.example.com:8443/mcp"],
+  ])("refuses %s before any request", async (_label, url) => {
+    const fetch = ok();
+    await expect(
+      connected(fetch).read({ url, toolName: "search", connection: "crm" }),
+    ).rejects.toMatchObject({ code: MCP_CONNECTION_REFUSED, retryable: false });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  // RFC 9728: a root protected resource document may name the origin or a parent path.
+  it.each([
+    ["the origin", "https://mcp.example.com", "https://mcp.example.com/mcp"],
+    ["a parent path", "https://mcp.example.com/a", "https://mcp.example.com/a/b"],
+  ])("sends a connection for %s to a URL under it", async (_label, resource, url) => {
+    const fetch = ok();
+    await createMcpIntegrationFromEnv({
+      fetch,
+      resolveHost: async () => ["93.184.216.34"],
+      connections: { crm: { ...connections.crm, resource } },
+    }).read({ url, toolName: "search", connection: "crm" });
+    expect(new Headers(requestTo(fetch, "tools/call")?.headers).get("authorization")).toBe(
+      "Bearer conn-secret-token",
+    );
+  });
+
+  it.each([
+    ["another host", "https://mcp.example.com", "https://evil.example.com/mcp"],
+    ["a sibling path", "https://mcp.example.com/a", "https://mcp.example.com/ab"],
+  ])("refuses a connection for %s", async (_label, resource, url) => {
+    const fetch = ok();
+    await expect(
+      createMcpIntegrationFromEnv({
+        fetch,
+        resolveHost: async () => ["93.184.216.34"],
+        connections: { crm: { ...connections.crm, resource } },
+      }).read({ url, toolName: "search", connection: "crm" }),
+    ).rejects.toMatchObject({ code: MCP_CONNECTION_REFUSED });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("refuses a caller authorization header alongside a connection", async () => {
+    const fetch = ok();
+    await expect(
+      connected(fetch).write({
+        url: "https://mcp.example.com/mcp",
+        toolName: "search",
+        connection: "crm",
+        headers: { AUTHORIZATION: "Bearer mine" },
+      }),
+    ).rejects.toMatchObject({ code: MCP_CONNECTION_REFUSED });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("refuses an unknown connection", async () => {
+    const fetch = ok();
+    await expect(
+      connected(fetch).read({
+        url: "https://mcp.example.com/mcp",
+        toolName: "search",
+        connection: "toString",
+      }),
+    ).rejects.toMatchObject({ code: MCP_CONNECTION_REFUSED });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("masks the connection token a server echoes back", async () => {
+    const fetch = answersWith((id) =>
+      toolResult(
+        {
+          isError: true,
+          content: [{ type: "text", text: "token conn-secret-token rejected" }],
+        },
+        id,
+      ),
+    );
+    const refusal = await connected(fetch)
+      .read({ url: "https://mcp.example.com/mcp", toolName: "search", connection: "crm" })
+      .catch((error: unknown) => error);
+    expect(JSON.stringify(refusal, Object.getOwnPropertyNames(refusal))).not.toContain(
+      "conn-secret-token",
+    );
+    expect(String((refusal as Error).message)).not.toContain("conn-secret-token");
   });
 });

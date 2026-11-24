@@ -54,6 +54,7 @@ export type {
 export { createHttpIntegrationFromEnv } from "./http-integration";
 export type {
   ListMcpTools,
+  McpConnection,
   McpDiscoveryInput,
   McpIntegrationOptions,
   McpToolDescriptor,
@@ -63,6 +64,7 @@ export { createMcpDiscoveryFromEnv } from "./mcp-integration";
 export {
   createMcpIntegrationFromEnv,
   MCP_ARGUMENTS_REFUSED,
+  MCP_CONNECTION_REFUSED,
   MCP_INPUT_REJECTED,
   MCP_TOOL_LIST_UNAUTHORIZED,
 } from "./mcp-integration";
