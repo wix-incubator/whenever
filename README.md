@@ -1,5 +1,7 @@
 # Whenever SDK and standalone adapter
 
+Ask your AI once. Whenever runs the workflow every day: TypeScript workflows for ChatGPT, Claude and coding agents.
+
 Build a workflow automation locally with your coding agent, then deploy it to [Whenever](https://www.whenever.dev/?utm_source=github&utm_medium=readme&utm_campaign=whenever_beta_launch), which runs it as code on a schedule, a webhook, an event or on demand, with managed credentials and a run log. Your agent writes typed TypeScript against this SDK; the deployed workflow runs on its own trigger, without the agent.
 
 **Get started:** [www.whenever.dev](https://www.whenever.dev/?utm_source=github&utm_medium=readme&utm_campaign=whenever_beta_launch) · [Docs](https://www.whenever.dev/docs?utm_source=github&utm_medium=readme&utm_campaign=whenever_beta_launch) · [MCP setup](https://www.whenever.dev/mcp?utm_source=github&utm_medium=readme&utm_campaign=whenever_beta_launch)
